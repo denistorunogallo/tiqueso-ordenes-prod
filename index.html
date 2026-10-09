@@ -803,6 +803,56 @@ const CSS = `@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono
   .rev{background:var(--verde-suave)!important;opacity:.75}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
+  /* nube-9: pestañas, asistente de DTW y avance por orden */
+  .pestanas{display:flex;gap:2px;background:var(--panel);border:1px solid var(--borde);border-radius:6px;
+       padding:4px;margin-bottom:14px;overflow-x:auto}
+  .pestana{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 8px;border:none;
+       background:none;border-radius:4px;cursor:pointer;color:var(--acero);font-size:13px;white-space:nowrap}
+  .pestana.on{background:var(--verde-suave);color:var(--tiqueso);font-weight:600}
+  .pestana .chip{text-transform:none;letter-spacing:0;font-size:10px}
+  .bola{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;
+       background:#DFE6E2;color:var(--acero);font-size:10.5px;font-weight:700;flex:0 0 20px}
+  .pestana.on .bola{background:var(--tiqueso);color:#fff}
+  .bola.ok{background:var(--verde-suave);color:var(--verde)}
+  .chip.v{background:var(--verde-suave);color:var(--tiqueso);text-transform:none;letter-spacing:0;font-size:10.5px;padding:3px 8px;border-radius:10px}
+  .chip.q{background:var(--queso-suave);color:var(--queso);text-transform:none;letter-spacing:0;font-size:10.5px;padding:3px 8px;border-radius:10px}
+  .chip.g{background:#EEF2F0;color:var(--gris);text-transform:none;letter-spacing:0;font-size:10.5px;padding:3px 8px;border-radius:10px}
+  .barra-pasos{background:var(--panel);border:1px solid var(--borde);border-radius:6px;padding:10px;margin-bottom:14px}
+  .segmentos{display:flex;gap:4px;margin-bottom:8px}
+  .segmentos span{flex:1;height:5px;border-radius:3px;background:#D5DDD8}
+  .segmentos span.h{background:var(--verde)} .segmentos span.a{background:var(--oro)}
+  .pasos{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+  .paso-btn{display:flex;gap:7px;align-items:flex-start;text-align:left;padding:7px 6px;border:1px solid transparent;
+       border-radius:4px;background:none;cursor:pointer}
+  .paso-btn.viendo{border-color:var(--borde);background:var(--fondo)}
+  .paso-btn.hecho .bola{background:var(--verde);color:#fff}
+  .paso-btn.bloq{opacity:.55}
+  .paso-txt b{display:block;font-size:12px;line-height:1.25}
+  .paso-txt small{display:block;font-size:10.5px;color:var(--gris);line-height:1.3;margin-top:2px}
+  @media (max-width:640px){ .paso-txt small{display:none} .paso-txt b{font-size:10.5px}
+       .pasos{gap:2px} .paso-btn{flex-direction:column;align-items:center;text-align:center;padding:5px 2px} }
+  .tabla-archivos{width:100%;border-collapse:collapse;font-size:12px}
+  .tabla-archivos th{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;
+       color:var(--gris);text-align:left;font-weight:500;border-bottom:1px solid var(--borde);padding:5px 6px}
+  .tabla-archivos td{border-bottom:1px solid var(--borde);padding:6px;vertical-align:top;overflow-wrap:anywhere}
+  summary.plegable{cursor:pointer;font-size:12.5px;color:var(--acero);font-weight:500;padding:4px 0}
+  ol.guia{margin:6px 0 0;padding-left:20px;font-size:12px;color:var(--acero);line-height:1.6}
+  .pie-paso{position:sticky;bottom:0;display:flex;justify-content:space-between;align-items:center;gap:10px;
+       flex-wrap:wrap;background:var(--panel);border-top:1px solid var(--borde);margin:14px -16px -16px;
+       padding:12px 16px;border-radius:0 0 6px 6px}
+  .prog{display:inline-flex;gap:3px;align-items:center}
+  .prog i{width:8px;height:8px;border-radius:50%;background:#D5DDD8;display:inline-block}
+  .prog i.h{background:var(--verde)} .prog i.a{background:var(--oro)}
+  .tira-dia{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel);
+       border:1px solid var(--borde);border-radius:6px;padding:10px 12px;margin-bottom:10px}
+  .tira-dia input{width:auto;min-width:160px}
+  @media (max-width:640px){
+    .titulo-app{display:none}
+    .pestana{padding:8px 3px;font-size:12px;gap:4px;flex-direction:column}
+    .pestana .chip{display:none}
+    .bola{width:18px;height:18px;flex-basis:18px;font-size:9.5px}
+  }
+
 `;
 
 /* ══════════════ MÓDULO: data.js — catálogos embebidos ══════════════ */
@@ -4510,10 +4560,10 @@ function docEntryAjeno(o){
 }
 function listaParaRecibir(o){
   const faltan=[];
-  if(!o.docEntry) faltan.push("DocEntry de la orden");
+  if(!o.docEntry) faltan.push("número interno de SAP (paso 2)");
   else if(docEntryAjeno(o))
-    faltan.push("el DocEntry " + o.docEntry + " es de una orden de " + o.docEntryCodigo +
-                ", no de " + o.codigo + " (volvé a pegar la consulta)");
+    faltan.push("el número interno " + o.docEntry + " es de una orden de " + o.docEntryCodigo +
+                ", no de " + o.codigo + " (volvé a pegar la consulta del paso 2)");
   if(!o.lote) faltan.push("lote del producto");
   if(!o.codigo) faltan.push("código");
   if(!cantidadDe(o)) faltan.push("cantidad");
@@ -4581,6 +4631,9 @@ const ORDEN_VACIA = () => ({
   /* RecordKey con que salió en el OWOR y cuándo se armó ese archivo. Queda
      guardado en la orden, así no depende del orden de la lista en pantalla. */
   rkOwor:"", tandaOwor:"",
+  /* nube-9: avance en SAP que antes no se guardaba. */
+  liberada:false,              /* se corrió la liberación en DTW */
+  componentesEntregados:false, /* se corrió la entrega de componentes */
   producto:"", presentacion:"", marca:"", lote:"", codigo:"", cajon:"",
   /* Salidas de cajón: a veces sacan una parte y el resto queda adentro. */
   salidaFinal:true,    /* false = queda producto en el cajón */
@@ -6457,7 +6510,7 @@ function ordenEjemploSucia(){
 /* Marca de armado. Varias veces un cambio "no aparecía" y era que el navegador
    o Vercel seguían sirviendo el archivo anterior. Con esto se compara de un
    vistazo contra la versión que se acaba de subir. */
-const VERSION_ARCHIVO = "2026-10-08 nube-8";
+const VERSION_ARCHIVO = "2026-10-09 nube-9";
 
 const CAMPOS_SAP = {
   remarks:            "Comentarios",
@@ -7360,7 +7413,7 @@ function VistaPegado({texto,destinos,todas}){
       {filas.map((f,i)=>{
         const p = f.par, d = f.destino;
         return <div key={i} style={{fontFamily:"var(--mono)",fontSize:11,color:COLOR[f.estado]}}>
-          {p.rk ? "RK " + p.rk + " · " : ""}DocEntry <strong>{p.docEntry}</strong>
+          {p.rk ? "RK " + p.rk + " · " : ""}N.º interno <strong>{p.docEntry}</strong>
           {p.docNum && " · " + p.docNum}
           {p.itemCode && " · " + p.itemCode}
           {"  → "}{d ? (d.codigo||"sin código") + " reg. " + (d.registro||"—") +
@@ -8078,12 +8131,14 @@ function RevertirRecepciones({fmt, fmtFecha, bom, doble, claveOrd, colCom1}){
     <h3 style={{margin:"0 0 4px",fontSize:14}}>Revertir recepciones equivocadas</h3>
     <div style={{fontSize:11.5,color:"var(--acero)",lineHeight:1.5}}>
       Saca el lote con una <strong>salida de mercancía</strong> (SAP no deja cancelar el recibo)
-      y <strong>cierra</strong> la orden con un comentario que explica el fallo. Los datos salen
-      de SAP: corré esta consulta con la fecha de la recepción y pegá el resultado con encabezado.
+      y <strong>cierra</strong> la orden con un comentario que explica el fallo. En SAP abrí{" "}
+      {CONSULTAS_SAP.ruta} → <strong>{CONSULTAS_SAP.reverso}</strong>, poné la fecha de la recepción
+      y pegá el resultado con encabezado.
     </div>
-    <pre style={{margin:"8px 0 0",fontSize:10.5,whiteSpace:"pre-wrap"}}>{CONSULTA_REVERSO()}</pre>
-    <button className="btn min" style={{marginTop:7}}
-      onClick={async()=>{ await copiar(CONSULTA_REVERSO()); }}>Copiar la consulta</button>
+    <details style={{marginTop:6}}><summary className="plegable">Ver el texto de la consulta</summary>
+      <pre style={{margin:"6px 0 0",fontSize:10.5,whiteSpace:"pre-wrap"}}>{CONSULTA_REVERSO()}</pre>
+      <button className="btn min" style={{marginTop:7}}
+        onClick={async()=>{ await copiar(CONSULTA_REVERSO()); }}>Copiar la consulta</button></details>
 
     <Lbl>Resultado de la consulta</Lbl>
     <textarea rows={4} value={texto} onChange={e=>{ setTexto(e.target.value); setQuitadas({}); setPuestas({}); }}
@@ -8133,15 +8188,15 @@ function RevertirRecepciones({fmt, fmtFecha, bom, doble, claveOrd, colCom1}){
         {vista && <pre style={{marginTop:0}}>{tabla(vista==="OIGE"?arch.oige:vista==="IGE1"?arch.ige1:
                                                    vista==="BTNT"?arch.btnt:arch.cerrar, fmt, doble)}</pre>}
         <div className="avi neu" style={{fontSize:11.5}}>
-          <strong>Paso 1 en DTW:</strong> objeto <strong>Inventory · Goods Issue</strong>, los tres
-          archivos en la misma corrida. Corré <strong>Run Simulation</strong> primero.
+          <strong>Paso 1 en DTW:</strong> {RUTA_DTW.reverso} (<code style={{fontFamily:"var(--mono)"}}>oInventoryGenExit</code>),
+          los tres archivos en la misma corrida. Corré <strong>Run Simulation</strong> primero.
         </div>
         <Archivo base={"OWOR_Cerrar_"+fechaSalida} filas={arch.cerrar} fmt={fmt} bom={bom} doble={doble}
           nota="Cierra las órdenes con el comentario del fallo. Se sube con Update existing data."
           onVer={()=>setVista(vista==="CER"?"":"CER")} viendo={vista==="CER"}/>
         <div className="avi neu" style={{fontSize:11.5}}>
-          <strong>Paso 2 en DTW,</strong> después de la salida: objeto <strong>Production Orders</strong>,
-          <strong> Update existing data</strong>. Cerrar no tiene vuelta atrás: probá primero con una.
+          <strong>Paso 2 en DTW,</strong> después de la salida: {RUTA_DTW.cerrar}.
+          Cerrar no tiene vuelta atrás: probá primero con una.
         </div>
       </div>
     </div>}
@@ -8212,6 +8267,189 @@ function BuscadorErrorDTW({ordenes}){
 }
 
 /* ---- App ---- */
+/* ══════════════ nube-9 · Pestañas y asistente de DTW ══════════════
+   La pantalla del día se parte en Transcribir · Revisar · Subir a SAP ·
+   Ajustes. Subir a SAP es un asistente de 5 pasos en el orden real de
+   trabajo: cada paso dice qué objeto de DTW abrir, en qué modo, qué archivo
+   va en qué fila, y tiene un botón "ya lo hice" que destraba el siguiente.  */
+
+/* ZIP sin compresión (método "store"). Un solo archivo por paso: en iPad
+   iOS bloquea varias descargas seguidas, y en la PC se descomprime y cada
+   TXT va a su fila de DTW tal cual. */
+const TABLA_CRC = (() => {
+  const t = new Uint32Array(256);
+  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n]=c>>>0; }
+  return t;
+})();
+function crc32(b){ let c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c = TABLA_CRC[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function armarZip(archivos){
+  const enc = new TextEncoder(), partes = [], central = [];
+  const d = new Date();
+  const hora = (d.getHours()<<11) | (d.getMinutes()<<5) | (d.getSeconds()>>1);
+  const dia  = ((d.getFullYear()-1980)<<9) | ((d.getMonth()+1)<<5) | d.getDate();
+  let off = 0;
+  archivos.forEach(a => {
+    const nom = enc.encode(a.nombre), dat = enc.encode(a.texto), crc = crc32(dat);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true); h.setUint16(4,20,true); h.setUint16(10,hora,true); h.setUint16(12,dia,true);
+    h.setUint32(14,crc,true); h.setUint32(18,dat.length,true); h.setUint32(22,dat.length,true); h.setUint16(26,nom.length,true);
+    partes.push(new Uint8Array(h.buffer), nom, dat);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0,0x02014b50,true); c.setUint16(4,20,true); c.setUint16(6,20,true); c.setUint16(12,hora,true); c.setUint16(14,dia,true);
+    c.setUint32(16,crc,true); c.setUint32(20,dat.length,true); c.setUint32(24,dat.length,true); c.setUint16(28,nom.length,true);
+    c.setUint32(42,off,true);
+    central.push(new Uint8Array(c.buffer), nom);
+    off += 30 + nom.length + dat.length;
+  });
+  const tamC = central.reduce((t,x)=>t+x.length,0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true); e.setUint16(8,archivos.length,true); e.setUint16(10,archivos.length,true);
+  e.setUint32(12,tamC,true); e.setUint32(16,off,true);
+  return new Blob([...partes, ...central, new Uint8Array(e.buffer)], {type:"application/zip"});
+}
+async function bajarZip(nombre, archivos){
+  const blob = armarZip(archivos);
+  /* En iPad la salida natural es la hoja de compartir (Guardar en Archivos). */
+  if(ES_IOS && window.isSecureContext && navigator.canShare){
+    const f = new File([blob], nombre, {type:"application/zip"});
+    try{ if(navigator.canShare({files:[f]})){ await navigator.share({files:[f], title:nombre}); return; } }
+    catch(e){ return; }
+  }
+  const u = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = u; a.download = nombre; a.rel = "noopener"; a.style.display = "none";
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ a.remove(); URL.revokeObjectURL(u); }, 60000);
+}
+
+/* Preferencias de vista del dispositivo: solo comodidad, nunca datos. */
+function leerLocal(k, def){ try{ const v = localStorage.getItem(k); return v===null ? def : v; }catch(e){ return def; } }
+function guardarLocal(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+
+const fechaCR = iso => (iso||"").split("-").reverse().join("/");
+
+/* Consultas que se guardan UNA vez en SAP, con nombre fijo para todos. */
+const CONSULTAS_SAP = {
+  ruta: "Herramientas → Consultas → Consultas de usuario → Produccion Actual",
+  categoria: "Produccion Actual",
+  dia: "ORDENES DEL DIA (APP - PASO#2)",
+  reverso: "DETALLES PARA REVERSO RECEPCIONES (APP)"
+};
+/* DTW está en inglés: las rutas se escriben tal como aparecen en su menú. */
+const RUTA_DTW = {
+  crear:    "Transactional Data → Add new data → Production → Production Order",
+  liberar:  "Transactional Data → Update existing data → Production → Production Order",
+  recibir:  "Transactional Data → Add new data → Inventory and Production → Goods Receipt",
+  entregar: "Transactional Data → Add new data → Inventory and Production → Goods Issue",
+  reverso:  "Transactional Data → Add new data → Inventory and Production → Goods Issue",
+  cerrar:   "Transactional Data → Update existing data → Production → Production Order"
+};
+
+function Pestanas({actual, onCambio, items}){
+  return <div className="pestanas">
+    {items.map(it =>
+      <button key={it.id} className={"pestana" + (actual===it.id ? " on" : "")}
+        onClick={()=>onCambio(it.id)}>
+        <span className={"bola " + (it.ok ? "ok" : "")}>{it.ok ? "✓" : it.icono}</span>
+        <span>{it.titulo}</span>
+        {it.chip && <span className={"chip " + (it.chipTono||"")}>{it.chip}</span>}
+      </button>)}
+  </div>;
+}
+
+/* Barra de los 5 pasos. Se puede mirar cualquier paso; el que toca va resaltado. */
+function BarraPasos({pasos, actual, viendo, onVer}){
+  return <div className="barra-pasos">
+    <div className="segmentos">
+      {pasos.map(p => <span key={p.n} className={p.hecho ? "h" : p.n===actual ? "a" : ""}/>)}
+    </div>
+    <div className="pasos">
+      {pasos.map(p =>
+        <button key={p.n} onClick={()=>onVer(p.n)}
+          className={"paso-btn" + (p.n===viendo ? " viendo" : "") + (p.hecho ? " hecho" : "") +
+                     (!p.hecho && p.n!==actual ? " bloq" : "")}>
+          <span className="bola">{p.hecho ? "✓" : p.n}</span>
+          <span className="paso-txt"><b>{p.titulo}</b><small>{p.resumen}</small></span>
+        </button>)}
+    </div>
+  </div>;
+}
+
+/* Un paso de DTW. Siempre la misma forma: objeto y modo, archivos → fila,
+   un botón para bajar todo, el detalle plegado y "ya lo hice" abajo. */
+function PasoDTW({n, titulo, objeto, tecnico, modo, archivos, zipBase, antesDeBajar,
+                  porque, comoDTW, cuidado, hecho, unoPorUno, children, despues}){
+  const conDatos = (archivos||[]).filter(a => a.filas && a.filas.length > 1);
+  const [verGuia, setVerGuia] = useState(() => leerLocal("tiq_guia_paso_" + n, "") !== "visto");
+  const bajarTodo = () => {
+    if(antesDeBajar && !antesDeBajar()) return;
+    bajarZip(zipBase + ".zip", conDatos.map(a => ({nombre:a.nombre, texto:tabla(a.filas, "txt", true)})));
+  };
+  return <div className="card paso-card">
+    <div className="lbl">Paso {n} de 5</div>
+    <h3 style={{margin:"2px 0 8px",fontSize:16}}>{titulo}</h3>
+
+    {objeto && <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+      <span className="chip v">DTW: {objeto}</span>
+      {tecnico && <span className="chip v" style={{fontFamily:"var(--mono)"}}>{tecnico}</span>}
+      {modo && <span className="chip q">{modo}</span>}
+    </div>}
+
+    {children}
+
+    {conDatos.length > 0 && <div style={{marginTop:10}}>
+      <table className="tabla-archivos">
+        <thead><tr><th>#</th><th>Archivo</th><th>Va en la fila de DTW</th><th>Filas</th></tr></thead>
+        <tbody>{conDatos.map((a,i) => <tr key={a.nombre}>
+          <td>{i+1}</td><td style={{fontFamily:"var(--mono)",fontSize:11}}>{a.nombre}</td>
+          <td><b>{a.fila}</b></td><td>{a.filas.length - 1}</td></tr>)}</tbody>
+      </table>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+        <button className="btn" onClick={bajarTodo}>
+          ⬇ Descargar {conDatos.length === 1 ? "el archivo" : "los " + conDatos.length + " archivos"} (ZIP)</button>
+      </div>
+      {unoPorUno && <details style={{marginTop:8}}>
+        <summary className="plegable">Ver, copiar o bajar uno por uno</summary>
+        <div style={{marginTop:8}}>{unoPorUno}</div>
+      </details>}
+    </div>}
+
+    {comoDTW && <details open={verGuia} style={{marginTop:10}}
+      onToggle={e => { if(!e.currentTarget.open){ guardarLocal("tiq_guia_paso_" + n, "visto"); setVerGuia(false); } }}>
+      <summary className="plegable">Cómo hacerlo en DTW</summary>
+      <ol className="guia">{comoDTW.map((t,i) => <li key={i}>{t}</li>)}</ol>
+    </details>}
+
+    {cuidado && <div className="avi war" style={{marginTop:10,marginBottom:0}}>{cuidado}</div>}
+
+    {porque && <details style={{marginTop:10}}>
+      <summary className="plegable">¿Por qué este paso?</summary>
+      <div style={{fontSize:12,color:"var(--acero)",lineHeight:1.55,marginTop:6}}>{porque}</div>
+    </details>}
+
+    {despues}
+
+    {hecho && <div className="pie-paso">
+      <span style={{fontSize:12,color:"var(--gris)"}}>{hecho.nota}</span>
+      <button className="btn" disabled={hecho.disabled} onClick={hecho.onClick}>{hecho.texto}</button>
+    </div>}
+  </div>;
+}
+
+/* Avance de una orden en seis puntos: transcrita · revisada · creada ·
+   liberada · recibida · componentes. Verde hecho, ámbar lo que sigue. */
+const ETAPAS_ORDEN = ["Transcrita","Revisada","Creada en SAP","Liberada","Recibida","Componentes"];
+function etapasDe(o, e){
+  const revisada = e && (e.txt === "completa" || e.txt === "revisada");
+  return [true, !!revisada, !!o.subida, !!(o.liberada || o.recibida), !!o.recibida, !!o.componentesEntregados];
+}
+function ProgresoOrden({o, e}){
+  const h = etapasDe(o, e);
+  const sigue = h.indexOf(false);
+  return <span className="prog" title={ETAPAS_ORDEN.map((t,i)=>(h[i]?"✓ ":"· ")+t).join("\n")}>
+    {h.map((x,i) => <i key={i} className={x ? "h" : i===sigue ? "a" : ""}/>)}
+  </span>;
+}
+
 function App(){
   const [fecha,setFecha]     = useState(hoy());
   const [ordenes,setOrdenesBase] = useState([]);
@@ -8244,6 +8482,10 @@ function App(){
   },[colabs]);
   const [listo,setListo]     = useState(false);
   const [activa,setActiva]   = useState(null);
+  /* nube-9: pestaña y paso que se están mirando (preferencia del dispositivo) */
+  const [pestana,setPestana] = useState(() => leerLocal("tiq_pestana","transcribir"));
+  const cambiarPestana = p => { setPestana(p); guardarLocal("tiq_pestana", p); };
+  const [pasoVer,setPasoVer] = useState(null);
   const [apiKey,setApiKey]   = useState("");
   const [modelo,setModelo]   = useState(MODELO_DEFECTO);
   const [config,setConfig]   = useState(false);
@@ -8264,6 +8506,7 @@ function App(){
   const [claveOrd,setClaveOrd] = useState(CLAVE_ORDEN_DEFECTO);
   const [colCajon,setColCajon] = useState(CAMPO_CAJON_DEFECTO);
   const [pegado,setPegado]   = useState("");
+  useEffect(()=>{ setPasoVer(null); }, [fecha]);
   const [avisoPegar,setAvisoPegar] = useState("");
   const [avisoResp,setAvisoResp] = useState(null);   /* {tipo, texto} */
   const respRef = useRef(null);
@@ -8849,7 +9092,7 @@ function App(){
 
   const csv = useMemo(()=>construirCSV(porSubir,fmtFecha,colCom1,colCom2,colCajon),
     [porSubir,fmtFecha,colCom1,colCom2,colCajon]);
-  const liberar = useMemo(()=>construirLiberar(porRecibir,claveOrd),[porRecibir,claveOrd]);
+  const liberar = useMemo(()=>construirLiberar(porRecibir.filter(o=>!o.liberada),claveOrd),[porRecibir,claveOrd]);
   const ajuste  = useMemo(()=>construirAjuste(porRecibir,claveOrd),[porRecibir,claveOrd]);
 
   /* Se pregunta una sola vez por acción: bajar tres archivos no debería
@@ -8928,7 +9171,7 @@ function App(){
     const saltadas = filas.filter(f=>f.estado==="liberada"||f.estado==="ya-usado").length;
     const faltan = conDocEntryHoy.filter(o=>!porId.has(o.id)).length;
     setAvisoResp(null);
-    setAvisoPegar(porId.size + " DocEntry asignado(s) " +
+    setAvisoPegar(porId.size + " número(s) interno(s) asignado(s) " +
       (porContenido ? "por artículo" : "por posición") + "." +
       (dudosas ? " " + dudosas + " fila(s) quedaron sin asignar por duda: escribilas a mano." : "") +
       (saltadas ? " Se saltaron " + saltadas + " de subidas anteriores (liberadas o ya asignadas)." : "") +
@@ -8942,6 +9185,26 @@ function App(){
 
   const orden = ordenes.find(o=>o.id===activa) || null;
   const puedeLeer = !NECESITA_KEY || !!apiKey;
+
+  /* ── nube-9: pestañas y pasos ── */
+  const huecos = huecosDeRegistros(ordenes);
+  const porRevisar = ordenes.filter(o => { const t = estadoOrden(o,ordenes,fecha).txt; return t!=="completa" && t!=="revisada"; }).length;
+  const aLiberar  = porRecibir.filter(o => o.docEntry && o.tipo!=="salida" && !o.liberada);
+  const aEntregar = listas.filter(o => o.docEntry && o.tipo!=="salida" && !o.componentesEntregados);
+  const hecho1 = listas.length>0 && porSubir.length===0;
+  const hecho2 = hecho1 && conDocEntryHoy.every(o=>o.docEntry);
+  const hecho3 = hecho2 && aLiberar.length===0;
+  const hecho4 = hecho3 && porRecepcion.length===0;
+  const hecho5 = hecho4 && aEntregar.length===0;
+  const pasoActual = !hecho1 ? 1 : !hecho2 ? 2 : !hecho3 ? 3 : !hecho4 ? 4 : !hecho5 ? 5 : 6;
+  const pasoVisto = pasoVer || (pasoActual>5 ? null : pasoActual);
+  const pasosSAP = [
+    {n:1, titulo:"Crear órdenes", hecho:hecho1, resumen: porSubir.length ? porSubir.length+" por crear" : "creadas"},
+    {n:2, titulo:"Números de SAP", hecho:hecho2, resumen: !hecho1 && !conDocEntryHoy.length ? "pendiente" : conDocEntryHoy.filter(o=>!o.docEntry).length ? conDocEntryHoy.filter(o=>!o.docEntry).length+" sin número" : "listos"},
+    {n:3, titulo:"Liberar", hecho:hecho3, resumen: aLiberar.length ? aLiberar.length+" por liberar" : hecho3 ? "liberadas" : "pendiente"},
+    {n:4, titulo:"Recibir", hecho:hecho4, resumen: porRecepcion.length ? porRecepcion.length+" por recibir" : hecho4 ? "recibidas" : "pendiente"},
+    {n:5, titulo:"Componentes", hecho:hecho5, resumen: aEntregar.length ? aEntregar.length+" por entregar" : hecho5 ? "entregados" : "pendiente"}
+  ];
 
   return <div>
     <style>{CSS}</style>
@@ -8958,16 +9221,13 @@ function App(){
                           color:"rgba(255,255,255,.45)"}}
                   title="Fecha en que se armó este archivo">v{VERSION_ARCHIVO}</span>
           </div>
-          <h1 style={{fontSize:18,fontWeight:600,color:"#fff",margin:"4px 0 0"}}>
+          <h1 className="titulo-app" style={{fontSize:18,fontWeight:600,color:"#fff",margin:"4px 0 0"}}>
             Empaque y Transformación de Quesos</h1>
-          <div style={{fontFamily:"var(--mono)",fontSize:10,color:"rgba(255,255,255,.6)",marginTop:3}}>
-            {CATALOGO.length} lotes · {ARTICULOS.length} artículos · {PLATAFORMA}
-          </div>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}}>
           <NubeBadge oscuro sync={sync} onModelos={()=>setVerModelos(true)} onLecturas={()=>setVerLecturas(true)}/>
           <button className="btn sec" style={{color:"#fff",borderColor:"rgba(255,255,255,.35)",padding:"7px 11px"}}
-            onClick={()=>setConfig(c=>!c)}>{puedeLeer?"⚙":"⚠ API"}</button>
+            onClick={()=>{ setActiva(null); cambiarPestana("ajustes"); }}>{puedeLeer?"⚙":"⚠ API"}</button>
         </div>
       </div>
     </header>
@@ -8976,9 +9236,6 @@ function App(){
       {verLecturas && <PanelLecturasIA appInicial="ordenes" onCerrar={()=>setVerLecturas(false)}/>}
       {verModelos && <PanelModelos app="ordenes" titulo="Órdenes de producción" cfg={modelosNube.cfg} guardar={modelosNube.guardar} onCerrar={()=>setVerModelos(false)}/>}
       {soloLectura && <Aviso tipo="neu">🔒 <strong>Modo solo lectura.</strong> Tu usuario ({ROL_TXT[rolNube]||rolNube}) puede ver las órdenes y descargar archivos, pero no modificarlas.</Aviso>}
-      <PanelConfig abierto={config} onCerrar={()=>setConfig(false)}
-        apiKey={apiKey} setApiKey={setApiKey} modelo={modelo} setModelo={setModelo}
-        colabs={colabs} setColabs={setColabs}/>
 
       {NECESITA_KEY && !apiKey && <Aviso tipo="err">
         <strong style={{color:"var(--alerta)"}}>Sin API key</strong>
@@ -8987,18 +9244,36 @@ function App(){
       </Aviso>}
 
       {!orden && <div>
-        <div className="card">
-          <div className="row" style={{alignItems:"flex-end",marginBottom:12}}>
-            <Campo etiqueta="Día de producción" valor={fecha} onChange={setFecha} tipo="date" ancho="60%"/>
-            <div style={{width:"40%",marginBottom:14,textAlign:"right",
-                         fontFamily:"var(--mono)",fontSize:11,color:"var(--gris)"}}>
-              {ordenes.length} orden{ordenes.length===1?"":"es"}
-              <div style={{fontSize:10,marginTop:2}}>
-                {fecha===hoy() ? "hoy · "+ahoraHHMM()+" CR" : "hora CR: "+ahoraHHMM()}
-              </div>
-            </div>
+        {/* ── Día de trabajo: siempre a la vista ── */}
+        <div className="tira-dia">
+          <div>
+            <div className="lbl" style={{marginBottom:3}}>Día de producción</div>
+            <input type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/>
           </div>
+          <div style={{flex:1,fontSize:12.5,color:"var(--acero)"}}>
+            <strong>{ordenes.length}</strong> orden{ordenes.length===1?"":"es"}
+            {huecos.faltan.length>0 && <span style={{color:"var(--queso)"}}>
+              {" "}· faltan los registros {huecos.faltan.join(", ")}</span>}
+            <div style={{fontSize:11,color:"var(--gris)",marginTop:2}}>
+              {fecha===hoy() ? "hoy · "+ahoraHHMM()+" CR" : "hora CR: "+ahoraHHMM()}</div>
+          </div>
+        </div>
 
+        <Pestanas actual={pestana} onCambio={cambiarPestana} items={[
+          {id:"transcribir", icono:"1", titulo:"Transcribir",
+           chip: cola.some(c=>c.estado==="pendiente"||c.estado==="error")
+                   ? cola.filter(c=>c.estado==="pendiente"||c.estado==="error").length+" fotos" : null, chipTono:"q"},
+          {id:"revisar", icono:"2", titulo:"Revisar",
+           chip: porRevisar>0 ? porRevisar+" por revisar" : ordenes.length ? null : "vacío",
+           chipTono: porRevisar>0 ? "q" : "g", ok: ordenes.length>0 && porRevisar===0},
+          {id:"sap", icono:"3", titulo:"Subir a SAP",
+           chip: !listas.length ? null : pasoActual>5 ? null : "paso "+pasoActual+" de 5",
+           chipTono:"g", ok: listas.length>0 && pasoActual>5},
+          {id:"ajustes", icono:"⚙", titulo:"Ajustes"}
+        ]}/>
+
+        {pestana==="transcribir" && <div>
+        <div className="card">
           <input ref={inputRef} type="file" accept="image/*" multiple
             onChange={subir} style={{display:"none"}}/>
           <input ref={camRef} type="file" accept="image/*" multiple capture="environment"
@@ -9108,14 +9383,16 @@ function App(){
 
           {error && <div className="avi err" style={{marginTop:12,marginBottom:0,color:"var(--alerta)"}}>{error}</div>}
 
-          <p style={{margin:"12px 0 0",fontSize:11.5,color:"var(--gris)",lineHeight:1.5}}>
-            La IA propone, la persona confirma. Hay un techo de precisión en lectura manuscrita:
-            el objetivo no es lectura perfecta sino que ningún error pase silencioso.
-            Revisá cada renglón contra la foto antes de exportar.
-            {!NECESITA_KEY ? " " + NOTA_PLATAFORMA : ""}
+          <p style={{margin:"12px 0 0",fontSize:12,color:"var(--gris)",lineHeight:1.5}}>
+            Tomá o elegí las fotos de las hojas y tocá <strong>Transcribir</strong>. La IA propone;
+            después revisás cada orden contra la foto en la pestaña <strong>Revisar</strong>.
           </p>
         </div>
+        </div>}
 
+        {pestana==="revisar" && <div>
+          {ordenes.length===0 && <div className="card" style={{color:"var(--acero)",fontSize:13}}>
+            No hay órdenes en este día. Empezá en la pestaña <strong>Transcribir</strong>.</div>}
         {ordenes.length>0 && <div className="card">
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",
                        marginBottom:10,gap:8}}>
@@ -9125,19 +9402,9 @@ function App(){
                 pdfDelDia(ordenes,fecha,actividades,histCajon); }}>
               Reporte para gerencia (PDF)</button>
           </div>
-          {(() => {
-            const h = huecosDeRegistros(ordenes);
-            if(!h.faltan.length) return null;
-            return <div className="avi war" style={{marginBottom:10}}>
-              <strong style={{color:"var(--tinta)"}}>
-                Faltan los registros {h.faltan.join(", ")}</strong>
-              <div style={{color:"var(--acero)",marginTop:3,lineHeight:1.5}}>
-                El día va del 1 al {h.hasta} y esos números no aparecen. Puede que
-                esas hojas todavía no se hayan transcrito.
-              </div>
-            </div>;
-          })()}
 
+          <div style={{fontSize:11,color:"var(--gris)",margin:"-2px 0 8px"}}>
+            Los puntos muestran en qué va cada orden: {ETAPAS_ORDEN.join(" · ")}.</div>
           {ordenes.slice().sort(porConsecutivo).map(o=>{
             const e=estadoOrden(o,ordenes,fecha);
             return <button key={o.id} onClick={()=>setActiva(o.id)}
@@ -9151,16 +9418,13 @@ function App(){
                 <span style={{fontSize:11,color:"var(--gris)",marginLeft:7}}>
                   reg. {o.registro||"—"}{o.tipo==="recortes"?" · recortes":""}
                   {o.pareja>1?" · pareja "+o.pareja:""}
-                  {o.docEntry?" · DocEntry "+o.docEntry:""}</span>
-                {(o.subida||o.recibida) && <span className="chip"
-                  style={{background:"var(--verde-suave)",color:"var(--verde)",marginTop:3,
-                          display:"inline-block"}}>
-                  {o.recibida?"recibida":"en SAP"}</span>}
+                  {o.docEntry?" · N.º interno "+o.docEntry:""}</span>
                 <div style={{fontSize:11,color:"var(--acero)",marginTop:2}}>
                   {o.producto||"(sin producto)"}</div>
               </span>
-              <span style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
+              <span style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
                 <span className="chip" style={{color:e.color}}>{e.txt}</span>
+                <ProgresoOrden o={o} e={e}/>
                 {/* Los temas de los avisos, aunque la orden ya esté revisada:
                     marcarla no garantiza que no se haya pasado algo. */}
                 {e.temas.length>0 &&
@@ -9171,72 +9435,6 @@ function App(){
             </button>;
           })}
         </div>}
-
-        <div className="card">
-          {/* La lista de días guardados se quitó: el calendario 📅 Días faltantes
-              ya muestra qué días tienen datos. Para abrir un día se usa la fecha
-              de arriba; queda solo el borrado del día que está en pantalla. */}
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
-            <span style={{fontSize:12,color:"var(--gris)",flex:1}}>
-              Día en pantalla: <strong style={{fontFamily:"var(--mono)"}}>{fecha}</strong></span>
-            <button className="btn min" style={{color:"var(--alerta)"}}
-              disabled={soloLectura || !dias.includes(fecha)}
-              onClick={()=>{ if(confirm("¿Borrar todas las órdenes del "+fecha+"?"+(conectadoNube?"\n\nTambién se borran de la nube para todos (el administrador las puede recuperar).":""))) borrarDia(fecha); }}>
-              Borrar este día</button>
-          </div>
-
-          <div style={{marginBottom:14}}>
-            <strong style={{fontSize:13}}>Pasar el trabajo a otro dispositivo</strong>
-            <p style={{margin:"3px 0 10px",fontSize:11.5,color:"var(--gris)",lineHeight:1.5}}>
-              Exportá al terminar en el iPad, guardá el archivo en OneDrive y en la casa
-              importalo en la PC para seguir donde ibas. Lleva las órdenes; las fotos no,
-              porque pesan demasiado para moverlas.
-            </p>
-
-            <input ref={respRef} type="file" accept=".json,application/json" multiple
-              onChange={e=>{ const fs=[...(e.target.files||[])]; if(fs.length>1){ e.target.value=""; importarVarios(fs); } else importarRespaldo(e); }} style={{display:"none"}}/>
-
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              <button className="btn sec" onClick={exportarDia} disabled={!ordenes.length}>
-                Exportar el {fecha}</button>
-              {!motivoNoCompartir("x.json","{}","json") &&
-                <button className="btn sec" onClick={compartirDia} disabled={!ordenes.length}>
-                  Compartir el respaldo</button>}
-              <button className="btn sec" disabled={soloLectura} onClick={()=>respRef.current.click()}>
-                Importar respaldo(s)</button>
-              {conectadoNube && puedeEditarNube &&
-                <button className="btn sec" onClick={subirDiasGuardados}>☁ Subir días guardados a la nube</button>}
-              <button className="btn sec" onClick={()=>setVerCobertura(v=>!v)}>📅 Días faltantes</button>
-            </div>
-
-            {verCobertura && <CoberturaDias titulo="Órdenes de producción" cargar={cargarCobertura}
-              onAbrir={f=>{ setFecha(f); setVerCobertura(false); try{ window.scrollTo(0,0); }catch(e){} }} onCerrar={()=>setVerCobertura(false)}/>}
-            {avisoResp && <div className={"avi "+(avisoResp.tipo==="ok"?"ok":"err")}
-              style={{marginTop:10,marginBottom:0}}>
-              <span style={{color: avisoResp.tipo==="ok"?"var(--verde)":"var(--alerta)"}}>
-                {avisoResp.texto}</span>
-            </div>}
-          </div>
-
-          <button className="btn" style={{background:"var(--alerta)",borderColor:"var(--alerta)"}}
-            disabled={!dias.length||soloLectura}
-            onClick={()=>{
-              if(conectadoNube){
-                if(!confirm("Esto borra los datos guardados en ESTE dispositivo. Lo que está en la nube no se toca y se vuelve a traer al abrir cada día. ¿Seguir?")) return;
-              }else{
-                if(!confirm("Esto borra las órdenes de TODOS los días guardados ("+dias.length+
-                            "). No se puede deshacer. ¿Seguir?")) return;
-                if(!confirm("Última confirmación: se pierde todo el trabajo no exportado.")) return;
-              }
-              borrarTodo();
-            }}>
-            {conectadoNube?"Borrar datos de este dispositivo":"Borrar todo y empezar de cero"}
-          </button>
-          <p style={{margin:"8px 0 0",fontSize:11,color:"var(--gris)",lineHeight:1.5}}>
-            No toca la API key ni el modelo. Los archivos que ya descargaste no se ven afectados.
-          </p>
-        </div>
-
         {enEspera.length>0 && <div className="card" style={{borderColor:"var(--queso)"}}>
           <h3 style={{margin:"0 0 3px",fontSize:14}}>
             {enEspera.length} orden(es) en espera</h3>
@@ -9255,187 +9453,153 @@ function App(){
                 onClick={()=>actualizar({...o,enEspera:false})}>Reactivar</button>
             </div>))}
         </div>}
-
-        {ordenes.length>0 && <div className="card">
-          <h3 style={{margin:"0 0 3px",fontSize:14}}>Exportar a DTW</h3>
-          <p style={{margin:"0 0 12px",fontSize:12,color:"var(--gris)"}}>
-            OWOR y WOR1 se cargan juntos, enlazados por RecordKey. El tercero, CONTROL,
-            no se sube.</p>
-          <div className="avi neu" style={{fontSize:11.5,marginBottom:12}}>
-            <strong>En DTW:</strong> objeto <strong>Production · Production Orders</strong>.
-            Tipo de archivo <code style={{fontFamily:"var(--mono)"}}>txt (Tab delimited)</code>.
-            Corré <strong>Run Simulation</strong> antes de importar.
-          </div>
-          {trabadas>0 && <Aviso tipo="war">
-            {trabadas} orden{trabadas===1?"":"es"} con errores queda{trabadas===1?"":"n"} fuera del archivo.
-            Abrilas desde el panel para corregirlas.</Aviso>}
-          <Archivo antesDeBajar={()=>{ if(!confirmarSinRevisar("Descargar")) return false;
-                                       sellarRK(porSubir,false); return true; }}
-            base={"OWOR_ProductionOrders_"+fecha} filas={csv.owor} fmt={fmtArch} bom={conBom} doble={dobleEnc}
-            nota="Va en la fila ProductionOrders, la de más arriba."
-            onVer={()=>setVista(vista==="OWOR"?"":"OWOR")} viendo={vista==="OWOR"}/>
-          <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"WOR1_ProductionOrders_Lines_"+fecha} filas={csv.wor1} fmt={fmtArch} bom={conBom} doble={dobleEnc}
-            nota="Va en ProductionOrders_Lines. Los componentes, enlazados por RecordKey."
-            onVer={()=>setVista(vista==="WOR1"?"":"WOR1")} viendo={vista==="WOR1"}/>
-          <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"CONTROL_"+fecha} filas={ctrl} fmt={fmtArch} bom={conBom} doble={dobleEnc}
-            nota="NO se sube a DTW. Es para anotar el DocNum y el DocEntry que devuelva SAP."
-            onVer={()=>setVista(vista==="CTRL"?"":"CTRL")} viendo={vista==="CTRL"}/>
-
-          {vista==="OWOR" && <pre style={{marginTop:12}}>{tabla(csv.owor,fmtArch,dobleEnc)}</pre>}
-          {vista==="WOR1" && <pre style={{marginTop:12}}>{tabla(csv.wor1,fmtArch,dobleEnc)}</pre>}
-          {vista==="CTRL" && <pre style={{marginTop:12}}>{tabla(ctrl,fmtArch,dobleEnc)}</pre>}
-          {vista==="OIGN" && <pre style={{marginTop:12}}>{tabla(rec.oign,fmtArch,dobleEnc)}</pre>}
-          {vista==="IGN1" && <pre style={{marginTop:12}}>{tabla(rec.ign1,fmtArch,dobleEnc)}</pre>}
-          {vista==="BTNT" && <pre style={{marginTop:12}}>{tabla(rec.btnt,fmtArch,dobleEnc)}</pre>}
-
-          <BuscadorErrorDTW ordenes={porSubir}/>
-
-          {porSubir.length>0 && <div className="avi war" style={{marginTop:12}}>
-            <strong style={{color:"var(--tinta)"}}>
-              Paso obligatorio: marcá estas {porSubir.length} después de importar</strong>
-            <div style={{color:"var(--acero)",margin:"3px 0 8px",lineHeight:1.5}}>
-              Sin esta marca, el paso 2 no las va a ver y la próxima exportación del día
-              las va a repetir.
-            </div>
-            <button className="btn" onClick={()=>{ sellarRK(porSubir,true); marcarOrdenes(porSubir,"subida",true); }}>
-              Ya las importé · marcar {porSubir.length} como subidas</button>
-          </div>}
-
-          {listas.some(o=>o.recibida) && <div style={{fontSize:11,color:"var(--gris)",marginTop:8}}>
-            {listas.filter(o=>o.recibida).length} orden(es) ya recibidas.{" "}
-            <button className="btn min"
-              onClick={()=>marcarOrdenes(listas.filter(o=>o.recibida),"recibida",false)}>
-              Desmarcar recibidas</button>
-          </div>}
-
-          {listas.some(o=>o.subida) && <div style={{fontSize:11,color:"var(--gris)",marginTop:8}}>
-            {listas.filter(o=>o.subida).length} orden(es) ya subidas hoy.{" "}
-            <button className="btn min"
-              onClick={()=>marcarOrdenes(listas.filter(o=>o.subida),"subida",false)}>
-              Desmarcar todas</button>
-          </div>}
-
-          <div style={{marginTop:14}}>
-            {/* La configuración de DTW se quitó en nube-8: valores fijos, confirmados
-                contra el template OWOR - ProductionOrders. */}
-            {ES_IOS && <div className="avi neu" style={{marginTop:12,marginBottom:0,fontSize:11.5}}>
-              <strong>Estás en iPad o iPhone.</strong> Bajá los archivos de a uno: iOS
-              bloquea las descargas encadenadas.
-              {window.isSecureContext
-                ? <span> Si "Descargar" no hace nada, usá <strong>Compartir</strong> y
-                    elegí Guardar en Archivos.</span>
-                : <span> Compartir no aparece porque la página no está en https.
-                    Publicada, ese botón te deja guardar en Archivos o mandar por AirDrop.
-                    Mientras tanto, <strong>Copiar</strong> sí funciona.</span>}
-            </div>}
-          </div>
         </div>}
 
-        {/* ── PASO 2 · RECEPCIÓN ── */}
-        {ordenes.length>0 && <div className="card">
-          <h3 style={{margin:"0 0 3px",fontSize:14}}>Paso 2 · Liberar y recibir</h3>
-          <p style={{margin:"0 0 12px",fontSize:12,color:"var(--gris)"}}>
-            Se hace después de importar las órdenes, porque necesita el <code>DocEntry</code> que
-            SAP les asignó. El lote del producto nace aquí, con su vencimiento.</p>
+        {pestana==="sap" && <div>
+          {listas.length===0
+            ? <div className="card" style={{color:"var(--acero)",fontSize:13}}>
+                {ordenes.length
+                  ? <span>Ninguna orden está lista todavía: corregí los errores en <strong>Revisar</strong>.</span>
+                  : <span>No hay órdenes en este día.</span>}</div>
+            : <div>
+            <BarraPasos pasos={pasosSAP} actual={pasoActual} viendo={pasoVisto} onVer={setPasoVer}/>
+            {trabadas>0 && <Aviso tipo="war">
+              {trabadas} orden{trabadas===1?"":"es"} con errores no entra{trabadas===1?"":"n"} en ningún archivo.
+              Corregila{trabadas===1?"":"s"} en <strong>Revisar</strong>.</Aviso>}
+            {pasoVisto>pasoActual && pasoActual<=5 && <Aviso tipo="neu">
+              Este paso todavía no toca: falta terminar el <strong>paso {pasoActual}</strong>.
+              Lo podés mirar, pero los archivos pueden salir incompletos.</Aviso>}
+            {pasoActual>5 && pasoVisto===null && <Aviso tipo="ok">
+              ✓ <strong>Todo el día está en SAP.</strong> Órdenes creadas, liberadas y recibidas, y componentes entregados.</Aviso>}
 
-          {porSubir.length>0 && <Aviso tipo="war">
+            {/* ═══ PASO 1 · CREAR ÓRDENES ═══ */}
+            {pasoVisto===1 && <PasoDTW n={1} titulo="Crear las órdenes en SAP"
+              objeto={RUTA_DTW.crear} tecnico="oProductionOrders" modo="Add new data"
+              archivos={[{nombre:"OWOR_ProductionOrders_"+fecha+".txt", fila:"ProductionOrders", filas:csv.owor},
+                         {nombre:"WOR1_ProductionOrders_Lines_"+fecha+".txt", fila:"ProductionOrders_Lines", filas:csv.wor1}]}
+              zipBase={"Paso1_CrearOrdenes_"+fecha}
+              antesDeBajar={()=>{ if(!confirmarSinRevisar("Descargar")) return false; sellarRK(porSubir,false); return true; }}
+              comoDTW={["En DTW (está en inglés): "+RUTA_DTW.crear+".",
+                        "File type: txt (Tab delimited). OWOR en la fila ProductionOrders y WOR1 en ProductionOrders_Lines.",
+                        "Corré Run Simulation y revisá que no haya rechazos.",
+                        "Import. Si DTW rechaza una línea, usá «¿DTW rechazó una línea?» acá abajo."]}
+              porque={<span>SAP necesita una orden de producción por cada producto del día, con sus componentes.
+                OWOR es la orden y WOR1 son sus componentes; van juntos, enlazados por RecordKey. SAP les pone el
+                número al importar: por eso el paso 2 los trae de vuelta.</span>}
+              unoPorUno={<div>
+                <Archivo antesDeBajar={()=>{ if(!confirmarSinRevisar("Descargar")) return false; sellarRK(porSubir,false); return true; }}
+                  base={"OWOR_ProductionOrders_"+fecha} filas={csv.owor} fmt={fmtArch} bom={conBom} doble={dobleEnc}
+                  nota="Fila ProductionOrders." onVer={()=>setVista(vista==="OWOR"?"":"OWOR")} viendo={vista==="OWOR"}/>
+                {vista==="OWOR" && <pre style={{marginTop:0}}>{tabla(csv.owor,fmtArch,dobleEnc)}</pre>}
+                <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"WOR1_ProductionOrders_Lines_"+fecha}
+                  filas={csv.wor1} fmt={fmtArch} bom={conBom} doble={dobleEnc}
+                  nota="Fila ProductionOrders_Lines." onVer={()=>setVista(vista==="WOR1"?"":"WOR1")} viendo={vista==="WOR1"}/>
+                {vista==="WOR1" && <pre style={{marginTop:0}}>{tabla(csv.wor1,fmtArch,dobleEnc)}</pre>}
+              </div>}
+              despues={<div>
+                {porSubir.length===0 && <div className="avi ok" style={{marginTop:10,marginBottom:0}}>
+                  No hay órdenes nuevas para crear: las {listas.filter(o=>o.subida).length} del día ya están en SAP.</div>}
+                <details style={{marginTop:10}}>
+                  <summary className="plegable">Hoja de control para imprimir (no va a DTW)</summary>
+                  <div style={{marginTop:8}}>
+                    <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"CONTROL_"+fecha} filas={ctrl}
+                      fmt={fmtArch} bom={conBom} doble={dobleEnc}
+                      nota="Para anotar a mano el número que SAP le pone a cada orden."
+                      onVer={()=>setVista(vista==="CTRL"?"":"CTRL")} viendo={vista==="CTRL"}/>
+                    {vista==="CTRL" && <pre style={{marginTop:0}}>{tabla(ctrl,fmtArch,dobleEnc)}</pre>}
+                  </div>
+                </details>
+                <BuscadorErrorDTW ordenes={porSubir}/>
+              </div>}
+              hecho={porSubir.length>0 ? {nota:"¿DTW las importó sin errores?", disabled:soloLectura,
+                texto:"Sí, marcar "+porSubir.length+" como creadas →",
+                onClick:()=>{ sellarRK(porSubir,true); marcarOrdenes(porSubir,"subida",true); guardarLocal("tiq_guia_paso_1","visto"); setPasoVer(null); }} : null}/>}
+
+            {/* ═══ PASO 2 · NÚMEROS DE SAP ═══ */}
+            {pasoVisto===2 && <PasoDTW n={2} titulo="Traer los números de SAP"
+              porque={<span>Al crear cada orden, SAP le pone dos números: el <strong>número de documento</strong> (DocNum,
+                el que ves en pantalla) y el <strong>número interno</strong> (DocEntry). Para liberar y recibir hace falta el
+                interno. Si se usara el de documento, la recepción quedaría contra otra orden y SAP la aceptaría sin
+                quejarse. La app empareja cada fila por artículo, registro y cantidad, nunca por posición, y salta las
+                órdenes ya liberadas de una subida anterior del día.</span>}
+              despues={null}
+              hecho={{nota: conDocEntryHoy.filter(o=>o.docEntry).length+" de "+conDocEntryHoy.length+" con número",
+                texto:"Seguir al paso 3 →", disabled: conDocEntryHoy.some(o=>!o.docEntry),
+                onClick:()=>setPasoVer(null)}}>
+              <ol className="guia" style={{fontSize:13,color:"var(--tinta)",marginTop:0}}>
+                <li>En SAP: {CONSULTAS_SAP.ruta} → <strong>{CONSULTAS_SAP.dia}</strong>.</li>
+                <li>Poné la fecha <strong>{fechaCR(fecha)}</strong> y ejecutala.</li>
+                <li>Seleccioná todo el resultado, <strong>con el encabezado</strong>, copialo y pegalo acá.</li>
+              </ol>
+              <details style={{margin:"6px 0 10px"}}>
+                <summary className="plegable">Ver el texto de la consulta</summary>
+                <div style={{fontSize:12,color:"var(--acero)",lineHeight:1.5,marginTop:6}}>
+                  Ya está guardada en SAP como <strong>{CONSULTAS_SAP.dia}</strong>. Si alguna vez se pierde, se vuelve a crear
+                  con este texto en la categoría <strong>{CONSULTAS_SAP.categoria}</strong>.
+                  <pre style={{margin:"6px 0 0",fontSize:10.5,whiteSpace:"pre-wrap"}}>{CONSULTA(fecha)}</pre>
+                  <button className="btn min" style={{marginTop:6}} onClick={async()=>{ await copiar(CONSULTA(fecha)); }}>
+                    Copiar la consulta</button>
+                </div>
+              </details>
+              <textarea rows={4} value={pegado} onChange={e=>setPegado(e.target.value)}
+                placeholder={"Pegá acá el resultado de «"+CONSULTAS_SAP.dia+"», con el encabezado"}
+                style={{fontFamily:"var(--mono)",fontSize:12,resize:"vertical"}}/>
+              <VistaPegado texto={pegado} destinos={conDocEntryHoy} todas={ordenes}/>
+              <div style={{display:"flex",gap:8,alignItems:"center",marginTop:8,flexWrap:"wrap"}}>
+                <button className="btn" onClick={()=>{ aplicarDocEntry(); setPasoVer(2); /* quedarse para ver los ✓ */ }} disabled={!pegado.trim()||soloLectura}>
+                  Aplicar números</button>
+                {avisoPegar && <span style={{fontSize:11.5,color:"var(--verde)"}}>{avisoPegar}</span>}
+              </div>
+              <table className="tabla-archivos" style={{marginTop:12}}>
+                <thead><tr><th>Orden en la app</th><th>N.º interno</th><th>N.º de documento</th><th></th></tr></thead>
+                <tbody>{porRecibir.map(o=><tr key={o.id}>
+                  <td style={{fontFamily:"var(--mono)"}}>{o.codigo||"—"} · reg. {o.registro||"—"}</td>
+                  <td style={{fontFamily:"var(--mono)"}}>{o.docEntry||"—"}</td>
+                  <td style={{fontFamily:"var(--mono)",color:"var(--gris)"}}>{o.docNum||"—"}</td>
+                  <td style={{fontSize:11.5,color: o.docEntry ? "var(--verde)" : o.tipo==="salida" ? "var(--morado)" : "var(--gris)"}}>
+                    {o.docEntry ? "✓" : o.tipo==="salida" ? "salida de cajón: se escribe en el registro" : "falta"}</td>
+                </tr>)}</tbody>
+              </table>
+          {salidasSinDocEntry.length>0 && <div className="avi war" style={{marginTop:12}}>
             <strong style={{color:"var(--tinta)"}}>
-              {porSubir.length} orden(es) no figuran acá</strong>
-            <div style={{color:"var(--acero)",margin:"3px 0 8px",lineHeight:1.5}}>
-              Están exportadas pero sin marcar como subidas, así que el paso 2 las ignora.
-              Si ya las importaste en DTW, marcalas ahora y aparecen enseguida.
+              {salidasSinDocEntry.length} salida(s) de cajón sin DocEntry</strong>
+            <div style={{color:"var(--acero)",margin:"3px 0 6px",lineHeight:1.5}}>
+              Su orden se creó semanas atrás, así que el número NO sale de la consulta de
+              hoy ni del pegado: hay que escribirlo dentro de cada registro. Si se dejan
+              así, la recepción quedaría sin documento contra el cual aplicarse.
             </div>
-            <button className="btn" onClick={()=>{ sellarRK(porSubir,true); marcarOrdenes(porSubir,"subida",true); }}>
-              Ya las importé · marcar {porSubir.length} como subidas</button>
-          </Aviso>}
-
-          {porRecibir.length===0 && <div className="avi neu">
-            {listas.length===0
-              ? <span style={{color:"var(--acero)"}}>
-                  Todavía no hay órdenes válidas en este día.</span>
-              : porSubir.length>0
-                ? <span style={{color:"var(--acero)"}}>
-                    Las {porSubir.length} órdenes del día siguen pendientes de subir.
-                    Hacé primero el paso 1 y marcalas como subidas; recién ahí aparecen acá.
-                  </span>
-                : <span style={{color:"var(--verde)"}}>
-                    Todas las órdenes del día ya fueron recibidas. No queda nada pendiente.
-                  </span>}
+            {salidasSinDocEntry.map(o=>
+              <div key={o.id} style={{fontFamily:"var(--mono)",fontSize:11,
+                   color:"var(--acero)"}}>
+                · reg. {o.registro||"—"} · {o.codigo} · lote {o.lote||"—"}
+                {o.docNum ? " · DocNum de la hoja: " + o.docNum : " · sin DocNum en la hoja"}
+              </div>)}
           </div>}
+            </PasoDTW>}
 
-          {porRecibir.length>0 && <div>
-
-          <div style={{marginBottom:12}}>
-            <Lbl>Órdenes pendientes de recibir</Lbl>
-            <div style={{border:"1px solid var(--borde)",borderRadius:3,overflow:"hidden"}}>
-              {porRecibir.map((o,i)=>(
-                <div key={o.id} style={{display:"flex",gap:8,alignItems:"baseline",
-                     padding:"6px 9px",fontSize:11.5,
-                     borderTop: i? "1px solid var(--borde)":"none",
-                     background: o.docEntry ? "var(--panel)"
-                                : o.tipo==="salida" ? "var(--morado-suave)"
-                                : "var(--alerta-suave)"}}>
-                  {/* El número es el RecordKey del pegado, no la posición en la
-                      lista: una salida de cajón no ocupa lugar en la consulta
-                      del día, y numerar por posición corría todo lo de abajo. */}
-                  <span style={{fontFamily:"var(--mono)",color:"var(--gris)",width:22}}>
-                    {o.tipo==="salida" ? "—" : conDocEntryHoy.findIndex(x=>x.id===o.id)+1}</span>
-                  <span style={{fontFamily:"var(--mono)",fontWeight:600,width:78}}>
-                    {o.codigo||"—"}</span>
-                  <span style={{flex:1,color:"var(--acero)"}}>reg. {o.registro||"—"}</span>
-                  <span style={{fontFamily:"var(--mono)",fontSize:11}}>
-                    {o.docEntry
-                      ? <span>DocEntry <strong>{o.docEntry}</strong>
-                          {o.docNum && <span style={{color:"var(--gris)"}}> · DocNum {o.docNum}</span>}</span>
-                      : o.tipo==="salida"
-                        ? <span style={{color:"var(--morado)"}}>
-                            salida de cajón · escribí el DocEntry en el registro</span>
-                        : <span style={{color:"var(--alerta)"}}>sin DocEntry</span>}
-                  </span>
-                  {/* Sirve para las que ya se recibieron fuera de la app: sin esto
-                      quedan trabadas pidiendo un DocEntry que ya no hace falta. */}
-                  <button className="btn min" title="Sacarla de la lista: ya se recibió"
-                    onClick={()=>marcarOrdenes([o],"recibida",true)}>ya recibida</button>
-                </div>))}
-            </div>
-            <div style={{fontSize:11,color:"var(--gris)",marginTop:6,lineHeight:1.45}}>
-              <strong>DocEntry y DocNum son números distintos.</strong> El que va a
-              <code style={{fontFamily:"var(--mono)"}}> BaseEntry </code> es el
-              <strong> DocEntry</strong>. Si se pega el DocNum, la recepción se asocia a otra
-              orden y SAP la acepta sin quejarse: hay que cancelarla a mano.
-              Si pegaste la consulta con encabezado, acá ves los dos y podés contrastarlos
-              contra SAP.
-            </div>
-          </div>
-
-          <div style={{border:"1px solid var(--queso)",borderRadius:3,
-                       padding:12,marginBottom:14,background:"var(--queso-suave)"}}>
-            <strong style={{fontSize:13}}>2a · Liberar las órdenes</strong>
-            <p style={{margin:"3px 0 10px",fontSize:11.5,color:"var(--acero)",lineHeight:1.5}}>
-              Obligatorio antes de recibir. SAP crea todas las órdenes en estado
-              Planificado y no acepta crearlas liberadas
-              (<em>"can be created in planned status only"</em>); pero tampoco deja
-              recibir una Planificada (<em>"status should be Released"</em>).
-              Se resuelve con esta corrida aparte.
-            </p>
-            <div style={{background:"var(--panel)",border:"1px solid var(--borde)",
-                         borderRadius:3,padding:"8px 10px",marginBottom:10,fontSize:11.5}}>
-              <strong>En DTW:</strong> objeto <strong>Production · Production Orders</strong>,
-              el mismo del paso 1. Pero elegí <strong>Update existing data</strong>, no
-              <em> Add new data</em>. El archivo va en la fila del padre
-              (<code style={{fontFamily:"var(--mono)"}}>ProductionOrders</code>); la fila de
-              las líneas se deja vacía.
-            </div>
-            {liberar.length>1
-              ? <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"LIBERAR_ProductionOrders_"+fecha} filas={liberar}
-                  fmt={fmtArch} bom={conBom} doble={dobleEnc}
-                  nota="Objeto Production Orders · modo Update existing data, NO Add new data."
+            {/* ═══ PASO 3 · LIBERAR ═══ */}
+            {pasoVisto===3 && <PasoDTW n={3} titulo="Liberar las órdenes"
+              objeto={RUTA_DTW.liberar} tecnico="oProductionOrders" modo="Update existing data"
+              archivos={[{nombre:"LIBERAR_ProductionOrders_"+fecha+".txt", fila:"ProductionOrders (la de líneas se deja vacía)", filas:liberar}]}
+              zipBase={"Paso3_Liberar_"+fecha}
+              antesDeBajar={()=>confirmarSinRevisar("Descargar")}
+              comoDTW={["En DTW: "+RUTA_DTW.liberar+". Ojo: Update existing data, no Add new data.",
+                        "Cargá el archivo en la fila ProductionOrders y dejá vacía ProductionOrders_Lines.",
+                        "Run Simulation y después Import."]}
+              porque={<span>SAP crea las órdenes en estado <em>Planificado</em> y no deja recibir producto contra una
+                orden planificada. Este archivo las pasa a <em>Liberado</em>. También completa las observaciones
+                sobre empaque (tanda, horario y colaboradores).</span>}
+              unoPorUno={<div>
+                <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"LIBERAR_ProductionOrders_"+fecha} filas={liberar}
+                  fmt={fmtArch} bom={conBom} doble={dobleEnc} nota="Update existing data."
                   onVer={()=>setVista(vista==="LIB"?"":"LIB")} viendo={vista==="LIB"}/>
-              : <div style={{fontSize:11.5,color:"var(--acero)"}}>
-                  Necesita el DocEntry. Pegalo abajo y el archivo aparece acá.</div>}
-            {vista==="LIB" && <pre style={{marginTop:0}}>{tabla(liberar,fmtArch,dobleEnc)}</pre>}
-          </div>
-
+                {vista==="LIB" && <pre style={{marginTop:0}}>{tabla(liberar,fmtArch,dobleEnc)}</pre>}
+              </div>}
+              despues={<div style={{marginTop:12}}>
+                {liberar.length<=1 && <div className="avi neu" style={{marginBottom:0}}>
+                  {aLiberar.length===0 && porRecibir.some(o=>o.docEntry)
+                    ? "Todas las órdenes con número ya están liberadas."
+                    : "Primero hacen falta los números de SAP (paso 2)."}</div>}
           {aCancelar.length>0 && <div style={{marginBottom:14}}>
             <Lbl>Órdenes creadas con el producto equivocado</Lbl>
             <div style={{fontSize:11.5,color:"var(--acero)",margin:"2px 0 8px",lineHeight:1.5}}>
@@ -9466,121 +9630,45 @@ function App(){
                   {o.correccion.codigo} → {o.codigo}</div>)}
             </div>}
           </div>}
+              </div>}
+              hecho={aLiberar.length>0 ? {nota:"¿DTW las liberó sin errores?", disabled:soloLectura,
+                texto:"Sí, marcar "+aLiberar.length+" como liberadas →",
+                onClick:()=>{ marcarOrdenes(aLiberar,"liberada",true); guardarLocal("tiq_guia_paso_3","visto"); setPasoVer(null); }} : null}/>}
 
-          <div className="avi neu" style={{fontSize:11.5}}>
-            <strong>Cómo sacar el DocEntry.</strong> No es el mismo número que ves en pantalla
-            (ese es el DocNum). Corré esta consulta en SAP B1 sobre HANA:
-            <pre style={{margin:"6px 0 0",fontSize:10.5,whiteSpace:"pre-wrap"}}>{CONSULTA(fecha)}</pre>
-            <div style={{marginTop:7}}>
-              Guardala una vez en SAP (Herramientas → Consultas → Administrador de consultas):
-              <code style={{fontFamily:"var(--mono)"}}> [%0] </code> hace que pida la fecha cada vez.
-              Copiá el resultado <strong>completo, con el encabezado</strong>: la app empareja
-              cada DocEntry por artículo (<code style={{fontFamily:"var(--mono)"}}>ItemCode</code>),
-              registro (<code style={{fontFamily:"var(--mono)"}}>Comments</code>) y cantidad, no
-              por posición. También sirve pegar tres columnas sin encabezado: RecordKey,
-              DocEntry y artículo (p. ej. <code style={{fontFamily:"var(--mono)"}}>1 95705 TIQ0150</code>).
-              Las órdenes ya liberadas (de una subida anterior del día) se saltan solas.
-              Revisá la vista previa antes de aplicar.
-            </div>
-            <button className="btn min" style={{marginTop:7}}
-              onClick={async()=>{ await copiar(CONSULTA(fecha)); }}>Copiar la consulta</button>
-          </div>
-
-          <div style={{fontWeight:600,fontSize:13,margin:"4px 0 6px"}}>
-            2b · Recibir el producto terminado</div>
-          <Lbl>Pegá el resultado de la consulta, con encabezado — {conDocEntryHoy.length} orden(es) del día</Lbl>
-          {porRecibir.length>conDocEntryHoy.length &&
-            <div style={{fontSize:11.5,color:"var(--acero)",marginTop:-6,marginBottom:8,
-                 lineHeight:1.45}}>
-              Son las mismas {conDocEntryHoy.length} que se subieron en el OWOR. Las{" "}
-              {porRecibir.length-conDocEntryHoy.length} salida(s) de cajón no entran acá:
-              su orden es de semanas atrás y su DocEntry se escribe dentro del registro.
-            </div>}
-          <textarea rows={4} value={pegado} onChange={e=>setPegado(e.target.value)}
-            placeholder={"DocEntry\tDocNum\tItemCode\tPlannedQty\tComments\n95705\t86103\tTIQ0150\t95\tRegistro de produccion N 4"}
-            style={{fontFamily:"var(--mono)",fontSize:12,resize:"vertical"}}/>
-          <VistaPegado texto={pegado} destinos={conDocEntryHoy} todas={ordenes}/>
-          <div style={{display:"flex",gap:8,alignItems:"center",marginTop:8,flexWrap:"wrap"}}>
-            <button className="btn sec" onClick={aplicarDocEntry} disabled={!pegado.trim()}>
-              Aplicar DocEntry</button>
-            {avisoPegar && <span style={{fontSize:11.5,color:"var(--verde)"}}>{avisoPegar}</span>}
-          </div>
-
-          <div style={{margin:"14px 0 10px",fontFamily:"var(--mono)",fontSize:11,
-                       color: recibibles.length ? "var(--verde)" : "var(--gris)"}}>
-            {recibibles.length} de {porRecepcion.length} orden(es) lista(s) para recibir
-          </div>
-
-          {porRecepcion.length>recibibles.length && <Aviso tipo="war">
-            <strong>Falta información en {porRecepcion.length-recibibles.length} orden(es)</strong>
-            <ul style={{margin:"5px 0 0",paddingLeft:17,color:"var(--acero)"}}>
-              {porRecepcion.filter(o=>listaParaRecibir(o).length).slice(0,6).map(o=>
-                <li key={o.id}>{o.codigo||"sin código"} (reg. {o.registro||"—"}):{" "}
-                  {listaParaRecibir(o).join(", ")}</li>)}
-            </ul>
-          </Aviso>}
-
-          {sinDocEntry>0 && <Aviso tipo="err">
-            <strong style={{color:"var(--alerta)"}}>
-              {sinDocEntry} de {porRecepcion.length} orden(es) sin DocEntry</strong>
-            <div style={{color:"var(--acero)",marginTop:3}}>
-              Podés ver los archivos para revisar la estructura, pero la columna
-              <code style={{fontFamily:"var(--mono)"}}> BaseEntry </code>
-              va vacía en esas filas y DTW las va a rechazar. Pegá los DocEntry arriba
-              antes de subirlos.</div>
-          </Aviso>}
-
-          <div>
-            <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"OIGN_Documents_"+fecha} filas={rec.oign} fmt={fmtArch} bom={conBom} doble={dobleEnc}
-              nota="Va en la fila Documents del paso 4."
-              onVer={()=>setVista(vista==="OIGN"?"":"OIGN")} viendo={vista==="OIGN"}/>
-            <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"IGN1_Document_Lines_"+fecha} filas={rec.ign1} fmt={fmtArch} bom={conBom} doble={dobleEnc}
-              nota="Va en Document_Lines. Lleva BaseType 202 y el BaseEntry de cada orden."
-              onVer={()=>setVista(vista==="IGN1"?"":"IGN1")} viendo={vista==="IGN1"}/>
-            <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"BTNT_BatchNumbers_"+fecha} filas={rec.btnt} fmt={fmtArch} bom={conBom} doble={dobleEnc}
-              nota="Va en BatchNumbers. El lote nuevo con su vencimiento. SerialNumbers se deja vacío."
-              onVer={()=>setVista(vista==="BTNT"?"":"BTNT")} viendo={vista==="BTNT"}/>
-          </div>
-
-          <div className="avi neu" style={{fontSize:11.5,marginTop:4}}>
-            <strong>En DTW:</strong> objeto <strong>Inventory · Goods Receipt</strong>
-            (no Goods Issue, que es la salida). Tipo de archivo
-            <code style={{fontFamily:"var(--mono)"}}> txt (Tab delimited)</code>.
-            Los tres van en la misma corrida, cada uno en su fila. Corré
-            <strong> Run Simulation</strong> antes de importar.
-          </div>
-          {salidasSinDocEntry.length>0 && <div className="avi war" style={{marginTop:12}}>
-            <strong style={{color:"var(--tinta)"}}>
-              {salidasSinDocEntry.length} salida(s) de cajón sin DocEntry</strong>
-            <div style={{color:"var(--acero)",margin:"3px 0 6px",lineHeight:1.5}}>
-              Su orden se creó semanas atrás, así que el número NO sale de la consulta de
-              hoy ni del pegado: hay que escribirlo dentro de cada registro. Si se dejan
-              así, la recepción quedaría sin documento contra el cual aplicarse.
-            </div>
-            {salidasSinDocEntry.map(o=>
-              <div key={o.id} style={{fontFamily:"var(--mono)",fontSize:11,
-                   color:"var(--acero)"}}>
-                · reg. {o.registro||"—"} · {o.codigo} · lote {o.lote||"—"}
-                {o.docNum ? " · DocNum de la hoja: " + o.docNum : " · sin DocNum en la hoja"}
-              </div>)}
-          </div>}
-
-          {enCajon.length>0 && <div className="avi esp" style={{marginTop:12}}>
-            <strong style={{color:"var(--tinta)"}}>
-              {enCajon.length} orden(es) esperando salir del cajón</strong>
-            <div style={{color:"var(--acero)",margin:"3px 0 6px",lineHeight:1.5}}>
-              Se crean y se liberan hoy, pero NO se reciben: el producto sale del cajón
-              en unas semanas y ahí se recibe, con su hoja de salida. Quedan pendientes
-              a propósito; no las marqués como recibidas.
-            </div>
-            {enCajon.map(o=>
-              <div key={o.id} style={{fontFamily:"var(--mono)",fontSize:11,
-                   color:"var(--acero)"}}>
-                · {o.codigo} · lote {o.lote||"—"} · cajón {o.cajon||"—"}
-                {o.docEntry ? " · DocEntry " + o.docEntry : " · sin DocEntry"}
-              </div>)}
-          </div>}
-
+            {/* ═══ PASO 4 · RECIBIR ═══ */}
+            {pasoVisto===4 && <PasoDTW n={4} titulo="Recibir el producto terminado"
+              objeto={RUTA_DTW.recibir} tecnico="oInventoryGenEntry" modo="Add new data"
+              archivos={[{nombre:"OIGN_Documents_"+fecha+".txt", fila:"Documents", filas:rec.oign},
+                         {nombre:"IGN1_Document_Lines_"+fecha+".txt", fila:"Document_Lines", filas:rec.ign1},
+                         {nombre:"BTNT_BatchNumbers_"+fecha+".txt", fila:"BatchNumbers", filas:rec.btnt}]}
+              zipBase={"Paso4_Recibir_"+fecha}
+              antesDeBajar={()=>{ if(sinDocEntry>0 && !confirm(sinDocEntry+" orden(es) no tienen número interno y DTW las va a rechazar. ¿Bajar igual?")) return false;
+                                   return confirmarSinRevisar("Descargar"); }}
+              cuidado={<span><strong>Goods Receipt, no Goods Issue.</strong> Goods Issue (<code style={{fontFamily:"var(--mono)"}}>oInventoryGenExit</code>)
+                saca producto; Goods Receipt lo mete.</span>}
+              comoDTW={["En DTW: "+RUTA_DTW.recibir+" (oInventoryGenEntry).",
+                        "OIGN en Documents, IGN1 en Document_Lines y BTNT en BatchNumbers.",
+                        "Run Simulation y después Import.",
+                        "En SAP queda como Entrada de mercancías."]}
+              porque={<span>Acá nace el lote del producto terminado, con su vencimiento. Cada recepción se liga a su
+                orden por el número interno; SAP toma el artículo de la orden.</span>}
+              unoPorUno={<div>
+                <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"OIGN_Documents_"+fecha} filas={rec.oign} fmt={fmtArch} bom={conBom} doble={dobleEnc}
+                  nota="Fila Documents." onVer={()=>setVista(vista==="OIGN"?"":"OIGN")} viendo={vista==="OIGN"}/>
+                {vista==="OIGN" && <pre style={{marginTop:0}}>{tabla(rec.oign,fmtArch,dobleEnc)}</pre>}
+                <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"IGN1_Document_Lines_"+fecha} filas={rec.ign1} fmt={fmtArch} bom={conBom} doble={dobleEnc}
+                  nota="Fila Document_Lines." onVer={()=>setVista(vista==="IGN1"?"":"IGN1")} viendo={vista==="IGN1"}/>
+                {vista==="IGN1" && <pre style={{marginTop:0}}>{tabla(rec.ign1,fmtArch,dobleEnc)}</pre>}
+                <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"BTNT_BatchNumbers_"+fecha} filas={rec.btnt} fmt={fmtArch} bom={conBom} doble={dobleEnc}
+                  nota="Fila BatchNumbers." onVer={()=>setVista(vista==="BTNT"?"":"BTNT")} viendo={vista==="BTNT"}/>
+                {vista==="BTNT" && <pre style={{marginTop:0}}>{tabla(rec.btnt,fmtArch,dobleEnc)}</pre>}
+              </div>}
+              hecho={recibibles.length>0 ? {nota:"¿DTW las recibió sin errores?", disabled:soloLectura,
+                texto:"Sí, marcar "+recibibles.length+" como recibidas →",
+                onClick:()=>{ setOrdenes(os=>os.map(o=>recibibles.some(x=>x.id===o.id) ? {...o,recibida:true,liberada:true} : o));
+                              guardarLocal("tiq_guia_paso_4","visto"); setPasoVer(null); }} : null}>
+              <div style={{fontSize:12.5,color: recibibles.length ? "var(--verde)" : "var(--gris)",marginBottom:8}}>
+                {recibibles.length} de {porRecepcion.length} orden(es) lista(s) para recibir.</div>
           {ajuste.length>1 && <div style={{marginTop:12,marginBottom:12,
                 border:"1px solid var(--morado)",borderRadius:3,padding:12,
                 background:"var(--morado-suave)"}}>
@@ -9595,19 +9683,45 @@ function App(){
               nota="Modo Update existing data. Corrige PlannedQuantity con lo que salió del cajón."
               onVer={()=>setVista(vista==="AJU"?"":"AJU")} viendo={vista==="AJU"}/>
             {vista==="AJU" && <pre style={{marginTop:0}}>{tabla(ajuste,fmtArch,dobleEnc)}</pre>}
+          </div>}          {porRecepcion.length>recibibles.length && <Aviso tipo="war">
+            <strong>Falta información en {porRecepcion.length-recibibles.length} orden(es)</strong>
+            <ul style={{margin:"5px 0 0",paddingLeft:17,color:"var(--acero)"}}>
+              {porRecepcion.filter(o=>listaParaRecibir(o).length).slice(0,6).map(o=>
+                <li key={o.id}>{o.codigo||"sin código"} (reg. {o.registro||"—"}):{" "}
+                  {listaParaRecibir(o).join(", ")}</li>)}
+            </ul>
+          </Aviso>}          {enCajon.length>0 && <div className="avi esp" style={{marginTop:12}}>
+            <strong style={{color:"var(--tinta)"}}>
+              {enCajon.length} orden(es) esperando salir del cajón</strong>
+            <div style={{color:"var(--acero)",margin:"3px 0 6px",lineHeight:1.5}}>
+              Se crean y se liberan hoy, pero NO se reciben: el producto sale del cajón
+              en unas semanas y ahí se recibe, con su hoja de salida. Quedan pendientes
+              a propósito; no las marqués como recibidas.
+            </div>
+            {enCajon.map(o=>
+              <div key={o.id} style={{fontFamily:"var(--mono)",fontSize:11,
+                   color:"var(--acero)"}}>
+                · {o.codigo} · lote {o.lote||"—"} · cajón {o.cajon||"—"}
+                {o.docEntry ? " · DocEntry " + o.docEntry : " · sin DocEntry"}
+              </div>)}
           </div>}
+              {porRecepcion.length===0 && <div className="avi ok" style={{marginBottom:0}}>
+                No queda producto por recibir en este día.</div>}
+            </PasoDTW>}
 
-          {recibibles.length>0 && <div className="avi war" style={{marginTop:10}}>
-            <strong style={{color:"var(--tinta)"}}>Después de importar la recepción</strong>
-            <div style={{color:"var(--acero)",margin:"3px 0 8px"}}>
-              Marcalas para que no vuelvan a salir en el próximo archivo.</div>
-            <button className="btn" onClick={()=>marcarOrdenes(recibibles,"recibida",true)}>
-              Marcar {recibibles.length} como recibidas</button>
-          </div>}
-
-          </div>}
-
-          {comps.length>1 && <div style={{marginTop:16,paddingTop:12,
+            {/* ═══ PASO 5 · COMPONENTES ═══ */}
+            {pasoVisto===5 && <PasoDTW n={5} titulo="Entregar los componentes"
+              objeto={RUTA_DTW.entregar} tecnico="oInventoryGenExit" modo="Add new data"
+              comoDTW={["Bajá de SAP el Excel «Inventario en stock por lote» y cargalo acá.",
+                        "Revisá los componentes marcados para revisar.",
+                        "En DTW: "+RUTA_DTW.entregar+" (oInventoryGenExit), con los tres archivos en Documents, Document_Lines y BatchNumbers.",
+                        "Run Simulation y después Import."]}
+              porque={<span>Se hace al final del día, con todo transcrito: a veces falta la foto del pesaje de un proveedor.
+                Entrega solo contra existencias reales y va descontando: si un lote se usó en cuatro registros, el cuarto ve
+                lo que dejaron los tres anteriores. Las órdenes ya marcadas como entregadas no vuelven a salir.</span>}
+              despues={<details style={{marginTop:10}}>
+                <summary className="plegable">Hoja de apoyo para entregar a mano (no va a DTW)</summary>
+                <div style={{marginTop:8}}>          {comps.length>1 && <div style={{marginTop:16,paddingTop:12,
                 borderTop:"1px solid var(--borde)"}}>
             <strong style={{fontSize:13}}>Entrega de componentes</strong>
             <p style={{margin:"3px 0 10px",fontSize:11.5,color:"var(--acero)",lineHeight:1.5}}>
@@ -9622,35 +9736,11 @@ function App(){
               nota="NO se sube a DTW. Es para trabajar al lado de SAP."
               onVer={()=>setVista(vista==="COMP"?"":"COMP")} viendo={vista==="COMP"}/>
             {vista==="COMP" && <pre style={{marginTop:0}}>{tabla(comps,fmtArch,false)}</pre>}
-          </div>}
-
-          <p style={{margin:"14px 0 0",fontSize:11,color:"var(--gris)",lineHeight:1.5}}>
-            Los tres se suben juntos en la misma corrida. La emisión de componentes queda
-            pendiente hasta que los lotes de materia prima existan en el sistema.
-          </p>
-          <p style={{margin:"12px 0 0",fontSize:11,color:"var(--gris)",lineHeight:1.5}}>
-            El archivo exportado es el respaldo serio: viaja entre computadoras y no
-            se pierde al limpiar el navegador.</p>
-        </div>}
-
-        {/* Paso aparte, al final del día: a veces falta la foto del pesaje de
-            un proveedor y no conviene mezclarlo con la creación de órdenes. */}
-        {/* Va en su propia tarjeta y siempre visible: se usa DESPUÉS de recibir,
-            cuando ya no queda nada pendiente y el paso 2 se esconde. Los datos
-            salen de la consulta de SAP, no de las órdenes del día. */}
-        {!soloLectura && <div className="card">
-          <RevertirRecepciones fmt={fmtArch} fmtFecha={fmtFecha} bom={conBom}
-            doble={dobleEnc} claveOrd={claveOrd} colCom1={colCom1}/>
-        </div>}
-
-        {ordenes.length>0 && <div className="card">
-          <h3 style={{margin:"0 0 3px",fontSize:14}}>Paso 3 · Entrega de componentes</h3>
-          <p style={{margin:"0 0 12px",fontSize:12,color:"var(--gris)",lineHeight:1.45}}>
-            Se corre al final, con todo transcrito. Entrega solo contra existencias
-            reales y va descontando: si un lote se usó en cuatro registros, el cuarto
-            ve lo que dejaron los tres anteriores.
-          </p>
-
+          </div>}</div>
+              </details>}
+              hecho={aEntregar.length>0 ? {nota:"¿DTW entregó los componentes sin errores?", disabled:soloLectura,
+                texto:"Sí, marcar "+aEntregar.length+" orden(es) como entregadas ✓",
+                onClick:()=>{ marcarOrdenes(aEntregar,"componentesEntregados",true); guardarLocal("tiq_guia_paso_5","visto"); setPasoVer(null); }} : null}>
           {!inventario
             ? <div>
                 <div className="avi neu" style={{fontSize:11.5,marginBottom:10,lineHeight:1.5}}>
@@ -9678,7 +9768,7 @@ function App(){
                 </div>
 
                 {(() => {
-                  const plan = planEntrega(listas, inventario);
+                  const plan = planEntrega(listas.filter(o=>!o.componentesEntregados), inventario);
                   const porEstado = {};
                   plan.lineas.forEach(l => { porEstado[l.estado] = (porEstado[l.estado]||0)+1; });
                   const problemas = plan.lineas.filter(l => l.estado !== "listo");
@@ -9761,8 +9851,109 @@ function App(){
                   </div>;
                 })()}
               </div>}
+            </PasoDTW>}
+
+            <details style={{marginTop:4}}>
+              <summary className="plegable">Corregir marcas del día</summary>
+              <div style={{fontSize:12,color:"var(--acero)",marginTop:6,lineHeight:1.9}}>
+                Si marcaste algo por error, desmarcalo y el paso vuelve a aparecer.<br/>
+                <button className="btn min" disabled={soloLectura} onClick={()=>marcarOrdenes(listas.filter(o=>o.subida),"subida",false)}>Desmarcar creadas ({listas.filter(o=>o.subida).length})</button>{" · "}
+                <button className="btn min" disabled={soloLectura} onClick={()=>marcarOrdenes(listas.filter(o=>o.liberada),"liberada",false)}>Desmarcar liberadas ({listas.filter(o=>o.liberada).length})</button>{" · "}
+                <button className="btn min" disabled={soloLectura} onClick={()=>marcarOrdenes(listas.filter(o=>o.recibida),"recibida",false)}>Desmarcar recibidas ({listas.filter(o=>o.recibida).length})</button>{" · "}
+                <button className="btn min" disabled={soloLectura} onClick={()=>marcarOrdenes(listas.filter(o=>o.componentesEntregados),"componentesEntregados",false)}>Desmarcar entregadas ({listas.filter(o=>o.componentesEntregados).length})</button>
+              </div>
+            </details>
+          </div>}
         </div>}
 
+        {pestana==="ajustes" && <div>
+          <PanelConfig abierto={true} onCerrar={()=>cambiarPestana("revisar")}
+            apiKey={apiKey} setApiKey={setApiKey} modelo={modelo} setModelo={setModelo}
+            colabs={colabs} setColabs={setColabs}/>
+        <div className="card">
+          <h3 style={{margin:"0 0 10px",fontSize:14}}>Datos del día y del dispositivo</h3>
+          {/* La lista de días guardados se quitó: el calendario 📅 Días faltantes
+              ya muestra qué días tienen datos. Para abrir un día se usa la fecha
+              de arriba; queda solo el borrado del día que está en pantalla. */}
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+            <span style={{fontSize:12,color:"var(--gris)",flex:1}}>
+              Día en pantalla: <strong style={{fontFamily:"var(--mono)"}}>{fecha}</strong></span>
+            <button className="btn min" style={{color:"var(--alerta)"}}
+              disabled={soloLectura || !dias.includes(fecha)}
+              onClick={()=>{ if(confirm("¿Borrar todas las órdenes del "+fecha+"?"+(conectadoNube?"\n\nTambién se borran de la nube para todos (el administrador las puede recuperar).":""))) borrarDia(fecha); }}>
+              Borrar este día</button>
+          </div>
+
+          <div style={{marginBottom:14}}>
+            <strong style={{fontSize:13}}>Pasar el trabajo a otro dispositivo</strong>
+            <p style={{margin:"3px 0 10px",fontSize:11.5,color:"var(--gris)",lineHeight:1.5}}>
+              Exportá al terminar en el iPad, guardá el archivo en OneDrive y en la casa
+              importalo en la PC para seguir donde ibas. Lleva las órdenes; las fotos no,
+              porque pesan demasiado para moverlas.
+            </p>
+
+            <input ref={respRef} type="file" accept=".json,application/json" multiple
+              onChange={e=>{ const fs=[...(e.target.files||[])]; if(fs.length>1){ e.target.value=""; importarVarios(fs); } else importarRespaldo(e); }} style={{display:"none"}}/>
+
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button className="btn sec" onClick={exportarDia} disabled={!ordenes.length}>
+                Exportar el {fecha}</button>
+              {!motivoNoCompartir("x.json","{}","json") &&
+                <button className="btn sec" onClick={compartirDia} disabled={!ordenes.length}>
+                  Compartir el respaldo</button>}
+              <button className="btn sec" disabled={soloLectura} onClick={()=>respRef.current.click()}>
+                Importar respaldo(s)</button>
+              {conectadoNube && puedeEditarNube &&
+                <button className="btn sec" onClick={subirDiasGuardados}>☁ Subir días guardados a la nube</button>}
+              <button className="btn sec" onClick={()=>setVerCobertura(v=>!v)}>📅 Días faltantes</button>
+            </div>
+
+            {verCobertura && <CoberturaDias titulo="Órdenes de producción" cargar={cargarCobertura}
+              onAbrir={f=>{ setFecha(f); setVerCobertura(false); try{ window.scrollTo(0,0); }catch(e){} }} onCerrar={()=>setVerCobertura(false)}/>}
+            {avisoResp && <div className={"avi "+(avisoResp.tipo==="ok"?"ok":"err")}
+              style={{marginTop:10,marginBottom:0}}>
+              <span style={{color: avisoResp.tipo==="ok"?"var(--verde)":"var(--alerta)"}}>
+                {avisoResp.texto}</span>
+            </div>}
+          </div>
+
+          <button className="btn" style={{background:"var(--alerta)",borderColor:"var(--alerta)"}}
+            disabled={!dias.length||soloLectura}
+            onClick={()=>{
+              if(conectadoNube){
+                if(!confirm("Esto borra los datos guardados en ESTE dispositivo. Lo que está en la nube no se toca y se vuelve a traer al abrir cada día. ¿Seguir?")) return;
+              }else{
+                if(!confirm("Esto borra las órdenes de TODOS los días guardados ("+dias.length+
+                            "). No se puede deshacer. ¿Seguir?")) return;
+                if(!confirm("Última confirmación: se pierde todo el trabajo no exportado.")) return;
+              }
+              borrarTodo();
+            }}>
+            {conectadoNube?"Borrar datos de este dispositivo":"Borrar todo y empezar de cero"}
+          </button>
+          <p style={{margin:"8px 0 0",fontSize:11,color:"var(--gris)",lineHeight:1.5}}>
+            No toca la API key ni el modelo. Los archivos que ya descargaste no se ven afectados.
+          </p>
+        </div>
+          <div className="card">
+            <h3 style={{margin:"0 0 6px",fontSize:14}}>Consultas guardadas en SAP</h3>
+            <p style={{margin:"0 0 10px",fontSize:12,color:"var(--gris)",lineHeight:1.5}}>
+              Están en <strong>{CONSULTAS_SAP.ruta}</strong>. El texto queda acá por si hay que volver a crearlas.</p>
+            <details><summary className="plegable">{CONSULTAS_SAP.dia}</summary>
+              <pre style={{fontSize:10.5,whiteSpace:"pre-wrap"}}>{CONSULTA(fecha)}</pre>
+              <button className="btn min" onClick={async()=>{ await copiar(CONSULTA(fecha)); }}>Copiar</button></details>
+            <details><summary className="plegable">{CONSULTAS_SAP.reverso}</summary>
+              <pre style={{fontSize:10.5,whiteSpace:"pre-wrap"}}>{CONSULTA_REVERSO()}</pre>
+              <button className="btn min" onClick={async()=>{ await copiar(CONSULTA_REVERSO()); }}>Copiar</button></details>
+          </div>
+          {!soloLectura && <div className="card">
+            <RevertirRecepciones fmt={fmtArch} fmtFecha={fmtFecha} bom={conBom}
+              doble={dobleEnc} claveOrd={claveOrd} colCom1={colCom1}/>
+          </div>}
+          {ES_IOS && <div className="avi neu" style={{fontSize:11.5}}>
+            <strong>Estás en iPad o iPhone.</strong> Los botones «Descargar (ZIP)» abren la hoja de compartir:
+            elegí <strong>Guardar en Archivos</strong>.</div>}
+        </div>}
       </div>}
 
       {orden && <div>
