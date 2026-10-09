@@ -5792,13 +5792,15 @@ function EditorOrden({orden,onCambio,onBorrar,onUnir,foto,todas,onAgregarRecorte
 
         return <div className="avi war" style={{marginBottom:14}}>
           <strong style={{color:"var(--tinta)"}}>
-            Hay {hermanas.length === 1 ? "otro registro" : hermanas.length + " registros"}{" "}
-            con el consecutivo {o.registro} y el mismo producto</strong>
+            {/* Antes decía "Hay 2 registros…" contando solo los OTROS: con tres
+                hojas parecía que unía dos. Ahora cuenta el total. */}
+            Hay {hermanas.length + 1} registros con el consecutivo {o.registro} y el
+            mismo producto (este y {hermanas.length === 1 ? "1 más" : hermanas.length + " más"})</strong>
           <div style={{color:"var(--acero)",margin:"3px 0 8px",lineHeight:1.5}}>
             Si los lotes no cabían en una hoja y siguieron en otra, es una sola
             producción: conviene unirlas para que SAP no cree dos órdenes.
-            Se agregarían {totalComp} componente(s) a este registro y{" "}
-            {hermanas.length === 1 ? "el otro se borra" : "los otros se borran"}.
+            Se unen los {hermanas.length + 1} en este: se le agregan {totalComp} componente(s)
+            y {hermanas.length === 1 ? "el otro se borra" : "los otros " + hermanas.length + " se borran"}.
           </div>
           <button className="btn" onClick={unir}>
             Unir en este registro</button>
