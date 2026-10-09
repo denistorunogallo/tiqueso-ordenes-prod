@@ -8073,7 +8073,7 @@ function RevertirRecepciones({fmt, fmtFecha, bom, doble, claveOrd, colCom1}){
   const [quitadas,setQuitadas] = useState({});   /* filas desmarcadas a mano */
   const [puestas,setPuestas] = useState({});     /* filas marcadas a mano */
   const [vista,setVista] = useState("");
-  if(!abierto) return <button className="btn min" style={{marginTop:10}}
+  if(!abierto) return <button className="btn min" style={{margin:0}}
     onClick={()=>setAbierto(true)}>¿Se recibió contra la orden equivocada? Revertir con salida de mercancía</button>;
 
   const {filas, error} = interpretarReverso(texto);
@@ -8086,7 +8086,7 @@ function RevertirRecepciones({fmt, fmtFecha, bom, doble, claveOrd, colCom1}){
     setQuitadas(q=>({...q,[x.i]: !v && x.cruzada}));
   };
 
-  return <div className="card" style={{marginTop:12,borderColor:"var(--alerta)"}}>
+  return <div>
     <h3 style={{margin:"0 0 4px",fontSize:14}}>Revertir recepciones equivocadas</h3>
     <div style={{fontSize:11.5,color:"var(--acero)",lineHeight:1.5}}>
       Saca el lote con una <strong>salida de mercancía</strong> (SAP no deja cancelar el recibo)
@@ -9568,8 +9568,6 @@ function App(){
             Los tres van en la misma corrida, cada uno en su fila. Corré
             <strong> Run Simulation</strong> antes de importar.
           </div>
-          {!soloLectura && <RevertirRecepciones fmt={fmtArch} fmtFecha={fmtFecha} bom={conBom}
-            doble={dobleEnc} claveOrd={claveOrd} colCom1={colCom1}/>}
           {salidasSinDocEntry.length>0 && <div className="avi war" style={{marginTop:12}}>
             <strong style={{color:"var(--tinta)"}}>
               {salidasSinDocEntry.length} salida(s) de cajón sin DocEntry</strong>
@@ -9656,6 +9654,14 @@ function App(){
 
         {/* Paso aparte, al final del día: a veces falta la foto del pesaje de
             un proveedor y no conviene mezclarlo con la creación de órdenes. */}
+        {/* Va en su propia tarjeta y siempre visible: se usa DESPUÉS de recibir,
+            cuando ya no queda nada pendiente y el paso 2 se esconde. Los datos
+            salen de la consulta de SAP, no de las órdenes del día. */}
+        {!soloLectura && <div className="card">
+          <RevertirRecepciones fmt={fmtArch} fmtFecha={fmtFecha} bom={conBom}
+            doble={dobleEnc} claveOrd={claveOrd} colCom1={colCom1}/>
+        </div>}
+
         {ordenes.length>0 && <div className="card">
           <h3 style={{margin:"0 0 3px",fontSize:14}}>Paso 3 · Entrega de componentes</h3>
           <p style={{margin:"0 0 12px",fontSize:12,color:"var(--gris)",lineHeight:1.45}}>
