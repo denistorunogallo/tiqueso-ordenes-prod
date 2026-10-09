@@ -5767,6 +5767,11 @@ function EditorOrden({orden,onCambio,onBorrar,onUnir,foto,todas,onAgregarRecorte
            mismo consecutivo son producciones separadas, con lotes distintos, y
            unirlas mezclaría trazabilidad. Se permite que a una le falte el
            lote, que pasa cuando la hoja de continuación no lo repite. */
+        /* Solo en la entrada al cajón (deshidratado): ahí los lotes de un mismo
+           cajón no caben en una hoja y siguen en otra. En fraccionados, panadero
+           y análogo el mismo consecutivo se repite a propósito (una pareja o una
+           tanda por bloque de la hoja) y unirlos sería un error. */
+        if(o.tipo !== "deshidratado") return null;
         const hermanas = (todas||[]).filter(x => x.id !== o.id &&
           x.registro && x.registro === o.registro &&
           x.codigo === o.codigo && x.tipo === o.tipo &&
@@ -5874,46 +5879,6 @@ function EditorOrden({orden,onCambio,onBorrar,onUnir,foto,todas,onAgregarRecorte
       {(o.tipo==="deshidratado"||o.tipo==="salida") &&
         <Campo etiqueta="Cajón" valor={o.cajon} onChange={set("cajon")} cod/>}
       <MermaDeshidratado o={o}/>
-      {(() => {
-        /* Cuando los lotes no caben en una hoja, siguen en otra con el mismo
-           consecutivo. Son dos fotos pero un solo cajón: si quedan como dos
-           órdenes, SAP crea dos producciones donde hubo una. */
-        /* El lote tiene que ser el mismo: dos tandas del mismo producto en el
-           mismo consecutivo son producciones separadas, con lotes distintos, y
-           unirlas mezclaría trazabilidad. Se permite que a una le falte el
-           lote, que pasa cuando la hoja de continuación no lo repite. */
-        const hermanas = (todas||[]).filter(x => x.id !== o.id &&
-          x.registro && x.registro === o.registro &&
-          x.codigo === o.codigo && x.tipo === o.tipo &&
-          (!x.lote || !o.lote || x.lote === o.lote));
-        if(!hermanas.length) return null;
-        const totalComp = hermanas.reduce((t,x)=>t+(x.componentes||[]).length, 0);
-
-        const unir = () => {
-          const vistos = new Set((o.componentes||[])
-            .map(c => (c.codigo||"") + "|" + (c.lote||"") + "|" + (c.cantidad||"")));
-          const extra = [];
-          hermanas.forEach(x => (x.componentes||[]).forEach(c => {
-            const k = (c.codigo||"") + "|" + (c.lote||"") + "|" + (c.cantidad||"");
-            if(!vistos.has(k)){ vistos.add(k); extra.push({...c, id:uid()}); }
-          }));
-          onUnir(o, hermanas.map(x=>x.id), extra);
-        };
-
-        return <div className="avi war" style={{marginBottom:14}}>
-          <strong style={{color:"var(--tinta)"}}>
-            Hay {hermanas.length === 1 ? "otro registro" : hermanas.length + " registros"}{" "}
-            con el consecutivo {o.registro} y el mismo producto</strong>
-          <div style={{color:"var(--acero)",margin:"3px 0 8px",lineHeight:1.5}}>
-            Si los lotes no cabían en una hoja y siguieron en otra, es una sola
-            producción: conviene unirlas para que SAP no cree dos órdenes.
-            Se agregarían {totalComp} componente(s) a este registro y{" "}
-            {hermanas.length === 1 ? "el otro se borra" : "los otros se borran"}.
-          </div>
-          <button className="btn" onClick={unir}>
-            Unir en este registro</button>
-        </div>;
-      })()}
 
       {o.tipo==="salida" && (() => {
         /* La entrada de ese mismo cajón sabe cuál era el lote. Si difiere, lo
@@ -6071,21 +6036,7 @@ function EditorOrden({orden,onCambio,onBorrar,onUnir,foto,todas,onAgregarRecorte
       </div>}
 
     <div className="card">
-      <h3 style={{margin:"0 0 3px",fontSize:14}}>Datos de la orden en SAP</h3>
-      <p style={{margin:"0 0 12px",fontSize:12,color:"var(--gris)"}}>
-        Almacén 02 por defecto. La fecha de elaboración va a PostingDate, StartDate y DueDate.</p>
-      <div className="row">
-        <Campo etiqueta="Serie" valor={o.serie} onChange={set("serie")} ancho="34%" cod/>
-        <Campo etiqueta="Almacén" valor={o.almacen} onChange={set("almacen")} ancho="33%" cod/>
-        <div style={{width:"33%",marginBottom:14}}>
-          <Lbl>Tipo de orden</Lbl>
-          <select value={o.tipoOrden||"S"} onChange={ev=>set("tipoOrden")(ev.target.value)}>
-            <option value="S">S · Estándar</option>
-            <option value="P">P · Especial</option>
-            <option value="D">D · Desensamblaje</option>
-          </select>
-        </div>
-      </div>
+      <h3 style={{margin:"0 0 10px",fontSize:14}}>Datos de la orden en SAP</h3>
       {/* El campo solo aparece si trae algo: normalmente va vacío y no hay
           nada que editar, pero si la lectura metió el CVO hay que poder
           sacarlo. Antes la validación bloqueaba y no había dónde corregirlo. */}
@@ -6104,6 +6055,28 @@ function EditorOrden({orden,onCambio,onBorrar,onUnir,foto,todas,onAgregarRecorte
         </div>
       </div>}
 
+      {/* Serie, almacén y tipo casi nunca se tocan: van plegados con un resumen.
+          Se abren solos si alguno no tiene el valor de siempre, para que no
+          pase inadvertido. */}
+      <details open={!!(o.serie || (o.almacen||"02")!=="02" || (o.tipoOrden||"S")!=="S")}
+        style={{margin:"0 0 12px",fontSize:12}}>
+        <summary style={{cursor:"pointer",color:"var(--gris)"}}>
+          Almacén <span style={{fontFamily:"var(--mono)"}}>{o.almacen||"02"}</span>
+          {" · "}{({S:"Estándar",P:"Especial",D:"Desensamblaje"})[o.tipoOrden||"S"]}
+          {o.serie ? " · serie " + o.serie : ""} · cambiar</summary>
+        <div style={{marginTop:10}}>
+      <div className="row">
+        <Campo etiqueta="Serie" valor={o.serie} onChange={set("serie")} ancho="34%" cod/>
+        <Campo etiqueta="Almacén" valor={o.almacen} onChange={set("almacen")} ancho="33%" cod/>
+        <div style={{width:"33%",marginBottom:14}}>
+          <Lbl>Tipo de orden</Lbl>
+          <select value={o.tipoOrden||"S"} onChange={ev=>set("tipoOrden")(ev.target.value)}>
+            <option value="S">S · Estándar</option>
+            <option value="P">P · Especial</option>
+            <option value="D">D · Desensamblaje</option>
+          </select>
+        </div>
+      </div>
       <div className="avi neu" style={{fontSize:11.5,marginBottom:10}}>
         <strong>Estándar o Especial.</strong> Una orden <strong>Estándar</strong> toma los
         componentes de la lista de materiales del artículo en SAP; si el artículo no tiene
@@ -6118,6 +6091,8 @@ function EditorOrden({orden,onCambio,onBorrar,onUnir,foto,todas,onAgregarRecorte
         consecutivo de la serie; después se copia al registro físico. Si lo ponés a mano,
         se arriesga un choque con otra orden creada entremedio.
       </div>
+        </div>
+      </details>
       <Campo etiqueta="Fecha de elaboración" valor={o.fechaElaboracion}
         onChange={set("fechaElaboracion")} tipo="date"/>
       {dia && o.fechaElaboracion && o.fechaElaboracion!==dia &&
