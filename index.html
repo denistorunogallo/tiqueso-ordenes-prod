@@ -6487,12 +6487,16 @@ const CAMPOS_SAP = {
   journalremarks:     "Resumen del asiento",
   jrnlmemo:           "Resumen del asiento",
   pickremark:         "Observaciones sobre empaque",
+  pickremarks:        "Observaciones sobre empaque",
   pickrmrk:           "Observaciones sobre empaque"
 };
 const dondeSale = col => CAMPOS_SAP[(col||"").toLowerCase().replace(/[^a-z]/g,"")] || null;
 
 const COL_COM1_DEFECTO = "Remarks";
-const COL_COM2_DEFECTO = "PickRemark";
+/* El template de DTW (OWOR - ProductionOrders) la llama PickRemarks, con s:
+   campo PickRmrk, "Observaciones sobre empaque". Con "PickRemark" DTW la
+   dejaba sin mapear y el comentario 2 se perdía sin avisar. */
+const COL_COM2_DEFECTO = "PickRemarks";
 
 /* OWOR NO lleva ProductionOrderStatus. SAP solo permite crear órdenes en
    estado Planificado:
@@ -6529,11 +6533,13 @@ function construirCancelar(ordenes, clave){
 }
 
 function construirLiberar(ordenes, clave){
-  const cab = ["RecordKey", clave || CLAVE_ORDEN_DEFECTO, "ProductionOrderStatus"];
+  /* Lleva también PickRemarks: así las órdenes que se crearon con la columna
+     mal nombrada ("PickRemark") reciben su comentario 2 al liberarse. */
+  const cab = ["RecordKey", clave || CLAVE_ORDEN_DEFECTO, "ProductionOrderStatus", COL_COM2_DEFECTO];
   /* Una salida de cajón no se libera: su orden se liberó semanas atrás, al
      entrar. Volver a liberarla es pedirle a SAP algo que ya está hecho. */
   const filas = ordenes.filter(o=>o.docEntry && o.tipo!=="salida")
-    .map((o,i)=>[i+1, o.docEntry, "boposReleased"]);
+    .map((o,i)=>[i+1, o.docEntry, "boposReleased", com2De(o)||""]);
   return [cab, ...filas];
 }
 const CAB_WOR1 = ["RecordKey","LineNum","ItemNo","PlannedQuantity","BaseQuantity","Warehouse"];
@@ -8570,29 +8576,12 @@ function App(){
   },[]);
   useEffect(()=>{ if(apiKey) store.set(LS_KEY,apiKey); },[apiKey]);
   useEffect(()=>{ store.set(LS_MOD,modelo); },[modelo]);
-  useEffect(()=>{ (async()=>{ const f=await store.get("tiq_fmtfecha"); if(f) setFmtFecha(f); })(); },[]);
-  useEffect(()=>{ store.set("tiq_fmtfecha",fmtFecha); },[fmtFecha]);
-  useEffect(()=>{ (async()=>{
-    const a=await store.get("tiq_fmtarch"); if(a) setFmtArch(a);
-    const b=await store.get("tiq_bom");     if(b) setConBom(b==="1");
-  })(); },[]);
-  useEffect(()=>{ store.set("tiq_fmtarch",fmtArch); },[fmtArch]);
-  useEffect(()=>{ store.set("tiq_bom",conBom?"1":"0"); },[conBom]);
-  useEffect(()=>{ (async()=>{ const v=await store.get("tiq_doble");
-                              if(v!==null) setDobleEnc(v==="1"); })(); },[]);
-  useEffect(()=>{ store.set("tiq_doble",dobleEnc?"1":"0"); },[dobleEnc]);
-  useEffect(()=>{ (async()=>{
-    const a=await store.get("tiq_col1"); if(a) setColCom1(a);
-    const b=await store.get("tiq_col2"); if(b) setColCom2(b);
-  })(); },[]);
-  useEffect(()=>{ if(colCom1) store.set("tiq_col1",colCom1); },[colCom1]);
-  useEffect(()=>{ if(colCom2) store.set("tiq_col2",colCom2); },[colCom2]);
-  useEffect(()=>{ (async()=>{ const k=await store.get("tiq_clave"); if(k) setClaveOrd(k); })(); },[]);
-  useEffect(()=>{ if(claveOrd) store.set("tiq_clave",claveOrd); },[claveOrd]);
-  useEffect(()=>{ (async()=>{ const c=await store.get("tiq_cajon"); if(c) setColCajon(c); })(); },[]);
-  useEffect(()=>{ if(colCajon) store.set("tiq_cajon",colCajon); },[colCajon]);
-  useEffect(()=>{ (async()=>{ const c=await store.get("tiq_cajon"); if(c) setColCajon(c); })(); },[]);
-  useEffect(()=>{ if(colCajon) store.set("tiq_cajon",colCajon); },[colCajon]);
+  /* La configuración de DTW (columnas de comentarios, cajón, clave, formato
+     de archivo y de fecha, doble encabezado, BOM) quedó FIJA en nube-8: nadie
+     la cambiaba y un valor viejo guardado en un dispositivo (p. ej.
+     "PickRemark") seguía mandando aunque estuviera mal. Ya no se lee ni se
+     guarda en el dispositivo; los valores salen de las constantes. */
+
 
   function limpiarPantalla(){
     setActiva(null); setCola([]); setFotos({}); setVista(""); setError("");
@@ -9345,87 +9334,9 @@ function App(){
               Desmarcar todas</button>
           </div>}
 
-          <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid var(--borde)"}}>
-            <Lbl>Columnas de los comentarios en OWOR</Lbl>
-            <div className="row" style={{marginBottom:5}}>
-              <div style={{width:"50%"}}>
-                <input className="cod" value={colCom1}
-                  onChange={e=>setColCom1(e.target.value.trim())}/>
-                <div style={{fontSize:10.5,color:"var(--gris)",marginTop:3}}>
-                  Comentario 1 · n° de registro</div>
-              </div>
-              <div style={{width:"50%"}}>
-                <input className="cod" value={colCom2}
-                  onChange={e=>setColCom2(e.target.value.trim())}/>
-                <div style={{fontSize:10.5,color:"var(--gris)",marginTop:3}}>
-                  Comentario 2 · tanda, horario y colaboradores</div>
-              </div>
-            </div>
-            <div style={{fontSize:11,color:"var(--gris)",margin:"7px 0 14px",lineHeight:1.45}}>
-              El nombre exacto lo ves en el paso 5 de DTW, en el desplegable de
-              <strong> Target Fields</strong>. Si DTW deja la columna sin mapear, el
-              comentario se pierde sin avisar.
-              <div style={{marginTop:6,lineHeight:1.6}}>
-                {[["Comentario 1",colCom1],["Comentario 2",colCom2]].map(([q,col])=>{
-                  const donde = dondeSale(col);
-                  return <div key={q}>
-                    {q}: <code style={{fontFamily:"var(--mono)"}}>{col}</code>
-                    {donde
-                      ? <span> → aparece en <strong>{donde}</strong></span>
-                      : <span style={{color:"var(--queso)"}}> → campo no reconocido</span>}
-                  </div>;})}
-                {dondeSale(colCom2)==="Resumen del asiento" &&
-                  <div style={{color:"var(--alerta)",marginTop:5,lineHeight:1.5}}>
-                    Para que salga en <strong>Observaciones sobre empaque</strong> el nombre
-                    tiene que ser <code style={{fontFamily:"var(--mono)"}}>PickRemark</code>.
-                    {" "}<button className="btn min"
-                      onClick={()=>setColCom2("PickRemark")}>Cambiarlo</button>
-                  </div>}
-              </div>
-            </div>
-
-            <Lbl>Columna del cajón en OWOR</Lbl>
-            <input className="cod" value={colCajon} onChange={e=>setColCajon(e.target.value.trim())}/>
-            <div style={{fontSize:11,color:"var(--gris)",margin:"5px 0 14px",lineHeight:1.45}}>
-              Campo definido por el usuario donde va el cajón del deshidratado. Solo se llena
-              en las hojas de entrada a cajón; en las demás órdenes va vacío.
-            </div>
-
-            <Lbl>Formato de archivo</Lbl>
-            <select value={fmtArch} onChange={e=>setFmtArch(e.target.value)}>
-              {Object.keys(FORMATOS).map(k=>
-                <option key={k} value={k}>{FORMATOS[k].nombre}</option>)}
-            </select>
-            <label style={{display:"flex",gap:7,alignItems:"center",fontSize:11.5,
-                           color:"var(--gris)",margin:"7px 0 5px",cursor:"pointer"}}>
-              <input type="checkbox" checked={dobleEnc} onChange={e=>setDobleEnc(e.target.checked)}
-                style={{width:"auto",margin:0}}/>
-              Repetir el encabezado en dos filas
-            </label>
-            <div style={{fontSize:11,color:"var(--gris)",margin:"0 0 12px",lineHeight:1.45}}>
-              Las plantillas de DTW traen dos filas de encabezado y los datos arrancan en la
-              tercera. Con una sola, DTW se come el primer registro sin avisar.
-            </div>
-            <label style={{display:"flex",gap:7,alignItems:"center",fontSize:11.5,
-                           color:"var(--gris)",margin:"7px 0 5px",cursor:"pointer"}}>
-              <input type="checkbox" checked={conBom} onChange={e=>setConBom(e.target.checked)}
-                style={{width:"auto",margin:0}}/>
-              Agregar BOM al inicio del archivo
-            </label>
-            <div style={{fontSize:11,color:"var(--gris)",margin:"0 0 14px",lineHeight:1.45}}>
-              El BOM ayuda a Excel con los acentos y la Ñ, pero DTW puede leerlo como parte
-              del primer encabezado y rechazar la plantilla. Si DTW se queja de
-              <code style={{fontFamily:"var(--mono)"}}> RecordKey</code>, desactivalo.
-            </div>
-
-            <Lbl>Formato de fecha</Lbl>
-            <select value={fmtFecha} onChange={e=>setFmtFecha(e.target.value)}>
-              <option value="compacto">AAAAMMDD — lo habitual en DTW</option>
-              <option value="guiones">AAAA-MM-DD</option>
-            </select>
-            <div style={{fontSize:11,color:"var(--gris)",marginTop:5}}>
-              Si DTW rechaza las fechas, probá el otro formato. Aplica a los seis archivos.
-            </div>
+          <div style={{marginTop:14}}>
+            {/* La configuración de DTW se quitó en nube-8: valores fijos, confirmados
+                contra el template OWOR - ProductionOrders. */}
             {ES_IOS && <div className="avi neu" style={{marginTop:12,marginBottom:0,fontSize:11.5}}>
               <strong>Estás en iPad o iPhone.</strong> Bajá los archivos de a uno: iOS
               bloquea las descargas encadenadas.
@@ -9533,17 +9444,6 @@ function App(){
               <em> Add new data</em>. El archivo va en la fila del padre
               (<code style={{fontFamily:"var(--mono)"}}>ProductionOrders</code>); la fila de
               las líneas se deja vacía.
-              <div style={{marginTop:7}}>
-                <Lbl>Columna clave</Lbl>
-                <input className="cod" value={claveOrd}
-                  onChange={e=>setClaveOrd(e.target.value.trim())}/>
-                <div style={{color:"var(--gris)",marginTop:3,fontSize:11}}>
-                  Es el número que SAP asignó a la orden. En la plantilla de órdenes de
-                  producción suele llamarse <code style={{fontFamily:"var(--mono)"}}>AbsoluteEntry</code>,
-                  aunque en la tabla OWOR el campo sea DocEntry. Si DTW deja la columna sin
-                  mapear, probá con <code style={{fontFamily:"var(--mono)"}}>DocEntry</code>.
-                </div>
-              </div>
             </div>
             {liberar.length>1
               ? <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")} base={"LIBERAR_ProductionOrders_"+fecha} filas={liberar}
