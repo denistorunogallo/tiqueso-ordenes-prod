@@ -6480,7 +6480,7 @@ function ordenEjemploSucia(){
 /* Marca de armado. Varias veces un cambio "no aparecía" y era que el navegador
    o Vercel seguían sirviendo el archivo anterior. Con esto se compara de un
    vistazo contra la versión que se acaba de subir. */
-const VERSION_ARCHIVO = "2026-10-08 nube-7";
+const VERSION_ARCHIVO = "2026-10-08 nube-8";
 
 const CAMPOS_SAP = {
   remarks:            "Comentarios",
@@ -6847,10 +6847,15 @@ function leerRespaldo(texto){
 /* Consulta para SAP B1 sobre HANA: los identificadores van entre comillas
    dobles y con alias de tabla. La fecha, como literal AAAA-MM-DD. */
 function CONSULTA(fecha){
+  /* Con [%0] SAP pide la fecha al ejecutarla: se guarda una vez en el
+     Administrador de consultas y sirve para cualquier día. Las cerradas y
+     canceladas no salen; la fecha de liberación va al final porque una orden
+     ya liberada es de una subida anterior del día y la app la salta. */
   return 'SELECT T0."DocEntry", T0."DocNum", T0."ItemCode",\n' +
-         '       T0."PlannedQty", T0."Comments"\n' +
+         '       T0."PlannedQty", T0."Comments", T0."Status", T0."RlsDate"\n' +
          'FROM OWOR T0\n' +
-         'WHERE T0."PostDate" = \'' + fecha + '\'\n' +
+         'WHERE T0."PostDate" = [%0]\n' +
+         '  AND T0."Status" NOT IN (\'C\',\'L\')\n' +
          'ORDER BY T0."DocEntry"';
 }
 
@@ -6868,7 +6873,9 @@ const ENC_PEGADO = {
   item:     /^(itemcode|itemno|numero de producto|numero de articulo|codigo de articulo|articulo|producto)$/,
   cant:     /^(plannedqty|plannedquantity|cantidad planificada|cantidad planif\.?)$/,
   coment:   /^(comments|comentarios|remarks)$/,
-  rk:       /^(recordkey|record key|rk)$/
+  rk:       /^(recordkey|record key|rk)$/,
+  estado:   /^(status|estado|estado de la orden)$/,
+  libera:   /^(rlsdate|release date|fecha de liberacion|fecha liberacion)$/
 };
 const ES_ARTICULO = /^[A-Z]{2,4}\d{3,}[A-Z]?$/i;
 function celdaEnc(x){
@@ -6907,7 +6914,7 @@ function interpretarPegado(texto){
   const iEnt = col("docEntry");
   if(iEnt >= 0){
     const iNum = col("docNum"), iItem = col("item"), iCant = col("cant"), iCom = col("coment"),
-          iRk = col("rk");
+          iRk = col("rk"), iEst = col("estado"), iLib = col("libera");
     const filas = lineas.slice(1).map(parte).filter(t=>t.some(Boolean));
     const pares = filas.map((t,i)=>({orden:i+1,
         docEntry:(t[iEnt]||"").replace(/[^\d]/g,""),
@@ -6915,6 +6922,10 @@ function interpretarPegado(texto){
         itemCode: iItem>=0 ? (t[iItem]||"").trim().toUpperCase() : "",
         cantidades: iCant>=0 ? lecturasCantidad(t[iCant]) : [],
         rk: iRk>=0 ? parseInt(t[iRk],10)||null : null,
+        /* Liberada (R), cerrada (L) o cancelada (C), o con fecha de liberación:
+           es de una subida anterior y ya tiene su recepción o la va a tener. */
+        liberada: (iEst>=0 && /^[RLC]$/i.test((t[iEst]||"").trim())) ||
+                  (iLib>=0 && !!(t[iLib]||"").trim()),
         registro: iCom>=0 ? registroDeComentario(t.slice(iCom).join(" ")) : ""}))
       .filter(x=>/^\d+$/.test(x.docEntry||""));
     return {modo: iItem>=0 ? "contenido" : "encabezado", pares};
@@ -6956,8 +6967,13 @@ function interpretarPegado(texto){
 /* Decide a qué orden va cada DocEntry. Con artículo: por artículo, después
    registro, después cantidad; si queda más de una candidata no asigna nada
    (mejor pedirlo a mano que adivinar). Sin artículo: por posición, con aviso. */
-function emparejarDocEntry(interpretado, destinos){
+function emparejarDocEntry(interpretado, destinos, todas){
   const {modo, pares} = interpretado;
+  /* DocEntry que ya tiene otra orden del día (fuera de las que esperan): no
+     se puede volver a usar. */
+  const ids = new Set(destinos.map(d=>d.id));
+  const yaUsados = new Set((todas||[]).filter(o=>!ids.has(o.id) && o.docEntry)
+                                      .map(o=>String(o.docEntry)));
   /* Si todas tienen el RecordKey guardado, el orden del archivo se rearma con
      eso y no con el de la lista. */
   const todasConRK = destinos.length && destinos.every(d=>d.rkOwor);
@@ -6976,13 +6992,17 @@ function emparejarDocEntry(interpretado, destinos){
   const casa = (o,p) => !p.cantidades.length ||
     p.cantidades.some(n=>Math.abs(n - (parseFloat(cantidadDe(o))||0)) < 0.0005);
   /* Primero las filas más específicas, para que una ambigua no se lleve la de otra. */
-  const resultado = pares.map(p=>({par:p, destino:null, estado:""}));
+  const resultado = pares.map(p=>({par:p, destino:null,
+    estado: p.liberada ? "liberada" : yaUsados.has(String(p.docEntry)) ? "ya-usado" : ""}));
+  const bloqueada = r => r.estado==="liberada" || r.estado==="ya-usado";
   const candidatas = p => {
     let c = destinos.filter(d => !usados.has(d.id) &&
       String(d.codigo||"").toUpperCase() === p.itemCode);
-    if(c.length>1 && p.registro){
+    /* Si SAP dice el registro y ninguna candidata lo tiene, no es ninguna de
+       ellas (puede ser la de otra subida del día con el mismo artículo). */
+    if(c.length && p.registro){
       const r = c.filter(d => String(d.registro||"").trim() === p.registro);
-      if(r.length) c = r;
+      c = r.length ? r : c.filter(d => !String(d.registro||"").trim());
     }
     if(c.length>1 && p.cantidades.length){
       const q = c.filter(d => casa(d,p));
@@ -6997,7 +7017,7 @@ function emparejarDocEntry(interpretado, destinos){
   for(let vuelta=0; vuelta<pares.length; vuelta++){
     let avance = false;
     resultado.forEach(r=>{
-      if(r.destino || r.estado==="fijo") return;
+      if(r.destino || bloqueada(r)) return;
       const c = candidatas(r.par);
       if(c.length===1){ r.destino=c[0]; usados.add(c[0].id); avance=true;
         r.estado = casa(c[0],r.par) ? "ok" : "cantidad"; }
@@ -7008,7 +7028,7 @@ function emparejarDocEntry(interpretado, destinos){
      órdenes en el orden del archivo, así que entre ellas el DocEntry menor es
      el RecordKey menor. Solo si todas tienen el RecordKey de la misma tanda. */
   const sueltas = {};
-  resultado.filter(r=>!r.destino).forEach(r=>{ (sueltas[r.par.itemCode]=sueltas[r.par.itemCode]||[]).push(r); });
+  resultado.filter(r=>!r.destino && !bloqueada(r)).forEach(r=>{ (sueltas[r.par.itemCode]=sueltas[r.par.itemCode]||[]).push(r); });
   Object.entries(sueltas).forEach(([item,rs])=>{
     const c = destinos.filter(d=>!usados.has(d.id) && String(d.codigo||"").toUpperCase()===item);
     if(c.length!==rs.length || c.length<2) return;
@@ -7027,7 +7047,7 @@ function emparejarDocEntry(interpretado, destinos){
     if(esperado !== String(r.par.rk)) r.estado = "rk";
   });
   resultado.forEach(r=>{
-    if(r.destino) return;
+    if(r.destino || bloqueada(r)) return;
     const c = candidatas(r.par);
     r.estado = c.length>1 ? "ambiguo"
              : destinos.some(d=>String(d.codigo||"").toUpperCase()===r.par.itemCode) ? "repetido"
@@ -7310,7 +7330,7 @@ class Salvavidas extends React.Component {
 /* Muestra qué entendió del pegado ANTES de aplicarlo. Un DocEntry en la orden
    equivocada asocia la recepción a otra orden de producción y SAP la acepta
    sin quejarse, así que conviene verlo antes. */
-function VistaPegado({texto,destinos}){
+function VistaPegado({texto,destinos,todas}){
   if(!texto.trim()) return null;
   const interp = interpretarPegado(texto);
   const {modo,pares} = interp;
@@ -7323,15 +7343,17 @@ function VistaPegado({texto,destinos}){
     </div>
   </div>;
 
-  const {porContenido, filas} = emparejarDocEntry(interp, destinos);
+  const {porContenido, filas} = emparejarDocEntry(interp, destinos, todas);
   const asignadas = filas.filter(f=>f.destino).length;
   const ETIQ = {ok:"✓", orden:"✓ por orden de subida", rk:"✓ por artículo (ojo: el RecordKey no coincide)", cantidad:"✓ (cantidad distinta)", posicion:"por posición",
                 ambiguo:"⚠ más de una orden posible: escribilo a mano",
-                repetido:"⚠ ya se asignó a otra fila", "sin-orden":"sin orden pendiente con ese artículo",
-                "sin-destino":"ninguna orden en esa posición"};
+                repetido:"⚠ no coincide con ninguna orden pendiente (registro, cantidad o ya asignada)", "sin-orden":"sin orden pendiente con ese artículo",
+                "sin-destino":"ninguna orden en esa posición",
+                liberada:"ya liberada: es de una subida anterior, se salta",
+                "ya-usado":"ese DocEntry ya lo tiene otra orden del día"};
   const COLOR = {ok:"var(--verde)", orden:"var(--verde)", rk:"var(--verde)", cantidad:"var(--alerta)", posicion:"var(--acero)",
                  ambiguo:"var(--alerta)", repetido:"var(--alerta)", "sin-orden":"var(--gris)",
-                 "sin-destino":"var(--alerta)"};
+                 "sin-destino":"var(--alerta)", liberada:"var(--gris)", "ya-usado":"var(--gris)"};
 
   return <div className="avi neu" style={{marginTop:8,marginBottom:0}}>
     <strong style={{fontSize:12}}>Leído como {NOMBRE_MODO[modo]}</strong>
@@ -7955,6 +7977,183 @@ function pdfDelDia(ordenes, fecha, actividades, historico){
   doc.save("Produccion_" + fecha + ".pdf");
 }
 
+
+
+/* ══════════════ REVERSO DE RECEPCIONES EQUIVOCADAS ══════════════
+   El 8/10/2026 las recepciones quedaron contra órdenes de otro artículo:
+   entró el artículo de la orden con el lote y la cantidad de otro registro.
+   SAP no deja cancelar esos recibos, así que el lote se saca con una SALIDA
+   DE MERCANCÍA (sin documento base) y la orden se CIERRA con un comentario
+   que explica el fallo. Los datos salen de SAP, no de la app: la app puede
+   tener ya los DocEntry corregidos.                                        */
+function CONSULTA_REVERSO(){
+  return 'SELECT T0."DocEntry" AS "RecepcionEntry", T0."DocNum" AS "RecepcionNum",\n' +
+         '       T1."BaseEntry" AS "OrdenEntry", T4."DocNum" AS "OrdenNum",\n' +
+         '       T1."ItemCode", T5."DistNumber" AS "Lote", T3."Quantity" AS "Cantidad",\n' +
+         '       T1."WhsCode" AS "Almacen", IFNULL(T6."Quantity",0) AS "Disponible",\n' +
+         '       T4."Status" AS "EstadoOrden", T4."Comments" AS "ComentarioOrden"\n' +
+         'FROM OIGN T0\n' +
+         'INNER JOIN IGN1 T1 ON T1."DocEntry" = T0."DocEntry" AND T1."BaseType" = 202\n' +
+         'INNER JOIN OITL T2 ON T2."DocEntry" = T1."DocEntry" AND T2."DocLine" = T1."LineNum"\n' +
+         '                  AND T2."DocType" = 59\n' +
+         'INNER JOIN ITL1 T3 ON T3."LogEntry" = T2."LogEntry"\n' +
+         'INNER JOIN OBTN T5 ON T5."ItemCode" = T3."ItemCode" AND T5."SysNumber" = T3."SysNumber"\n' +
+         'INNER JOIN OWOR T4 ON T4."DocEntry" = T1."BaseEntry"\n' +
+         'LEFT JOIN OBTQ T6 ON T6."ItemCode" = T3."ItemCode" AND T6."SysNumber" = T3."SysNumber"\n' +
+         '                 AND T6."WhsCode" = T1."WhsCode"\n' +
+         'WHERE T0."DocDate" = [%0] AND T0."CANCELED" = \'N\'\n' +
+         'ORDER BY T0."DocEntry"';
+}
+const ENC_REVERSO = {
+  recEntry:/^(recepcionentry)$/, recNum:/^(recepcionnum)$/, ordEntry:/^(ordenentry)$/,
+  ordNum:/^(ordennum)$/, item:/^(itemcode|numero de articulo)$/, lote:/^(lote|distnumber)$/,
+  cant:/^(cantidad|quantity)$/, alm:/^(almacen|whscode)$/, disp:/^(disponible)$/,
+  estado:/^(estadoorden)$/, coment:/^(comentarioorden)$/
+};
+function interpretarReverso(texto){
+  const lineas = (texto||"").split("\n").map(l=>l.replace(/\r$/,"")).filter(l=>l.trim());
+  if(lineas.length<2) return {filas:[], error: lineas.length ? "Falta el encabezado o las filas." : ""};
+  const parte = l => l.split("\t").map(x=>x.trim());
+  const enc = parte(lineas[0]).map(celdaEnc);
+  const col = {}; Object.entries(ENC_REVERSO).forEach(([k,re])=>{ col[k]=enc.findIndex(x=>re.test(x)); });
+  const faltan = ["recEntry","ordEntry","item","lote","cant","alm"].filter(k=>col[k]<0);
+  if(faltan.length) return {filas:[], error:"No encuentro las columnas de la consulta (pegala con su encabezado, separada por tabuladores)."};
+  const filas = lineas.slice(1).map(parte).map((t,i)=>{
+    const v = k => col[k]>=0 ? (t[col[k]]||"") : "";
+    const item = v("item").toUpperCase(), lote = v("lote");
+    const cant = lecturasCantidad(v("cant"))[0] || 0;
+    const disp = col.disp>=0 ? (lecturasCantidad(v("disp"))[0] ?? 0) : null;
+    /* El catálogo dice de qué artículo es el lote: si no es el de la orden,
+       la recepción quedó cruzada. */
+    const delLote = [...new Set(buscarPorLote(lote).map(c=>c.codigo))];
+    const cruzada = delLote.length>0 && !delLote.includes(item);
+    return {i, recEntry:v("recEntry").replace(/[^\d]/g,""), recNum:v("recNum").replace(/[^\d]/g,""),
+            ordEntry:v("ordEntry").replace(/[^\d]/g,""), ordNum:v("ordNum").replace(/[^\d]/g,""),
+            item, lote, cant, alm:v("alm"), disp, estado:v("estado").toUpperCase(),
+            coment:v("coment"), delLote, cruzada};
+  }).filter(f=>f.recEntry && f.item && f.lote);
+  return {filas, error: filas.length ? "" : "No hay filas con recepción, artículo y lote."};
+}
+const CAB_IGE1_REVERSO = ["RecordKey","LineNum","ItemCode","Quantity","WarehouseCode"];
+function construirReverso(filas, fechaIso, fmt, clave, colCom){
+  const oige=[["RecordKey","DocDate","DocDueDate","Comments","JournalMemo"]], ige1=[CAB_IGE1_REVERSO], btnt=[CAB_BTNT];
+  const f = fechaDTW(fechaIso, fmt);
+  const dmy = (fechaIso||"").split("-").reverse().join("/");
+  filas.forEach((x,i)=>{
+    const rk = i+1;
+    oige.push([rk,f,f,
+      ("Fallo en app Ordenes de Produccion: reverso de la recepcion " + (x.recNum||x.recEntry) +
+       " (orden " + (x.ordNum||x.ordEntry) + "), lote " + x.lote +
+       ". La recepcion quedo contra una orden de otro articulo.").slice(0,MAX_COM),
+      "Reverso recepcion erronea app Ordenes"]);
+    ige1.push([rk,0,x.item,String(x.cant),x.alm]);
+    btnt.push([rk,0,"",0,x.lote,"","","","","","",String(x.cant)]);
+  });
+  const cerrar=[["RecordKey", clave || CLAVE_ORDEN_DEFECTO, "ProductionOrderStatus", colCom || COL_COM1_DEFECTO]];
+  const vistas = new Set();
+  filas.filter(x=>x.ordEntry && x.estado!=="L" && x.estado!=="C").forEach(x=>{
+    if(vistas.has(x.ordEntry)) return; vistas.add(x.ordEntry);
+    cerrar.push([cerrar.length, x.ordEntry, "boposClosed",
+      ("FALLO APP ORDENES " + dmy + ": recepcion contra orden equivocada, revertida con salida de mercancia. " +
+       (x.coment||"")).slice(0,MAX_COM)]);
+  });
+  return {oige, ige1, btnt, cerrar};
+}
+
+function RevertirRecepciones({fmt, fmtFecha, bom, doble, claveOrd, colCom1}){
+  const [abierto,setAbierto] = useState(false);
+  const [texto,setTexto] = useState("");
+  const [fechaSalida,setFechaSalida] = useState(hoy());
+  const [quitadas,setQuitadas] = useState({});   /* filas desmarcadas a mano */
+  const [puestas,setPuestas] = useState({});     /* filas marcadas a mano */
+  const [vista,setVista] = useState("");
+  if(!abierto) return <button className="btn min" style={{marginTop:10}}
+    onClick={()=>setAbierto(true)}>¿Se recibió contra la orden equivocada? Revertir con salida de mercancía</button>;
+
+  const {filas, error} = interpretarReverso(texto);
+  const marcada = x => puestas[x.i] || (x.cruzada && !quitadas[x.i]);
+  const elegidas = filas.filter(marcada);
+  const arch = construirReverso(elegidas, fechaSalida, fmtFecha, claveOrd, colCom1);
+  const cortas = elegidas.filter(x=>x.disp!==null && x.disp < x.cant - 0.0005);
+  const tocar = (x,v) => {
+    setPuestas(p=>({...p,[x.i]: v && !x.cruzada}));
+    setQuitadas(q=>({...q,[x.i]: !v && x.cruzada}));
+  };
+
+  return <div className="card" style={{marginTop:12,borderColor:"var(--alerta)"}}>
+    <h3 style={{margin:"0 0 4px",fontSize:14}}>Revertir recepciones equivocadas</h3>
+    <div style={{fontSize:11.5,color:"var(--acero)",lineHeight:1.5}}>
+      Saca el lote con una <strong>salida de mercancía</strong> (SAP no deja cancelar el recibo)
+      y <strong>cierra</strong> la orden con un comentario que explica el fallo. Los datos salen
+      de SAP: corré esta consulta con la fecha de la recepción y pegá el resultado con encabezado.
+    </div>
+    <pre style={{margin:"8px 0 0",fontSize:10.5,whiteSpace:"pre-wrap"}}>{CONSULTA_REVERSO()}</pre>
+    <button className="btn min" style={{marginTop:7}}
+      onClick={async()=>{ await copiar(CONSULTA_REVERSO()); }}>Copiar la consulta</button>
+
+    <Lbl>Resultado de la consulta</Lbl>
+    <textarea rows={4} value={texto} onChange={e=>{ setTexto(e.target.value); setQuitadas({}); setPuestas({}); }}
+      placeholder={"RecepcionEntry\tRecepcionNum\tOrdenEntry\tOrdenNum\tItemCode\tLote\tCantidad\tAlmacen\tDisponible\t…"}
+      style={{fontFamily:"var(--mono)",fontSize:11,resize:"vertical"}}/>
+    {error && <div style={{color:"var(--alerta)",fontSize:11.5,marginTop:6}}>{error}</div>}
+
+    {filas.length>0 && <div style={{marginTop:8}}>
+      <div style={{fontSize:11.5,color:"var(--acero)",marginBottom:4}}>
+        Vienen marcadas las que el catálogo dice que están cruzadas (el lote es de otro artículo).
+        Revisá cada una.</div>
+      {filas.map(x=>
+        <label key={x.i} style={{display:"flex",gap:8,alignItems:"flex-start",fontFamily:"var(--mono)",
+               fontSize:11,padding:"3px 0",borderBottom:"1px solid var(--borde)",
+               color: x.cruzada ? "var(--alerta)" : "var(--acero)"}}>
+          <input type="checkbox" checked={!!marcada(x)} onChange={e=>tocar(x,e.target.checked)}
+            style={{width:"auto",flex:"0 0 auto",margin:"2px 0 0"}}/>
+          <span>Recibo {x.recNum||x.recEntry} · orden {x.ordNum||x.ordEntry} · {x.item} · lote {x.lote} ·
+            {" "}{x.cant} · {x.alm}
+            {x.delLote.length>0 && (x.cruzada ? " · el lote es de " + x.delLote.join("/") : " · correcta")}
+            {x.delLote.length===0 && " · lote fuera del catálogo: revisalo a mano"}
+            {x.disp!==null && x.disp < x.cant - 0.0005 && " · ⚠ disponible " + x.disp}
+            {(x.estado==="L"||x.estado==="C") && " · orden ya cerrada"}</span>
+        </label>)}
+    </div>}
+
+    {elegidas.length>0 && <div style={{marginTop:10}}>
+      <Lbl>Fecha de la salida de mercancía</Lbl>
+      <input type="date" value={fechaSalida} onChange={e=>setFechaSalida(e.target.value||hoy())}
+        style={{fontFamily:"var(--mono)",fontSize:12}}/>
+      {cortas.length>0 && <div className="avi err" style={{marginTop:8}}>
+        <strong style={{color:"var(--alerta)"}}>{cortas.length} lote(s) ya no tienen todo en el almacén</strong>
+        <div style={{color:"var(--acero)",marginTop:3}}>
+          Parte se vendió o se movió. La salida de esos va a fallar o dejar el lote en negativo:
+          sacalos del archivo y resolvelos aparte.</div>
+      </div>}
+      <div style={{marginTop:10}}>
+        <Archivo base={"OIGE_Documents_reverso_"+fechaSalida} filas={arch.oige} fmt={fmt} bom={bom} doble={doble}
+          nota="Salida de mercancía: fila Documents."
+          onVer={()=>setVista(vista==="OIGE"?"":"OIGE")} viendo={vista==="OIGE"}/>
+        <Archivo base={"IGE1_Document_Lines_reverso_"+fechaSalida} filas={arch.ige1} fmt={fmt} bom={bom} doble={doble}
+          nota="Document_Lines: artículo de la orden, cantidad y almacén de la recepción."
+          onVer={()=>setVista(vista==="IGE1"?"":"IGE1")} viendo={vista==="IGE1"}/>
+        <Archivo base={"BTNT_BatchNumbers_reverso_"+fechaSalida} filas={arch.btnt} fmt={fmt} bom={bom} doble={doble}
+          nota="BatchNumbers: el lote que entró por error."
+          onVer={()=>setVista(vista==="BTNT"?"":"BTNT")} viendo={vista==="BTNT"}/>
+        {vista && <pre style={{marginTop:0}}>{tabla(vista==="OIGE"?arch.oige:vista==="IGE1"?arch.ige1:
+                                                   vista==="BTNT"?arch.btnt:arch.cerrar, fmt, doble)}</pre>}
+        <div className="avi neu" style={{fontSize:11.5}}>
+          <strong>Paso 1 en DTW:</strong> objeto <strong>Inventory · Goods Issue</strong>, los tres
+          archivos en la misma corrida. Corré <strong>Run Simulation</strong> primero.
+        </div>
+        <Archivo base={"OWOR_Cerrar_"+fechaSalida} filas={arch.cerrar} fmt={fmt} bom={bom} doble={doble}
+          nota="Cierra las órdenes con el comentario del fallo. Se sube con Update existing data."
+          onVer={()=>setVista(vista==="CER"?"":"CER")} viendo={vista==="CER"}/>
+        <div className="avi neu" style={{fontSize:11.5}}>
+          <strong>Paso 2 en DTW,</strong> después de la salida: objeto <strong>Production Orders</strong>,
+          <strong> Update existing data</strong>. Cerrar no tiene vuelta atrás: probá primero con una.
+        </div>
+      </div>
+    </div>}
+    <button className="btn sec" style={{marginTop:10}} onClick={()=>setAbierto(false)}>Cerrar</button>
+  </div>;
+}
 
 /* Pegás el renglón que devolvió DTW y te dice de qué orden y de qué artículo
    está hablando, sin contar renglones. */
@@ -8732,7 +8931,7 @@ function App(){
       setAvisoPegar("No entendí el formato. Pegá el resultado de la consulta con su encabezado.");
       return;
     }
-    const {porContenido, filas} = emparejarDocEntry(interp, conDocEntryHoy);
+    const {porContenido, filas} = emparejarDocEntry(interp, conDocEntryHoy, ordenes);
     if(!porContenido && !confirm(
         "Lo pegado no trae la columna del artículo, así que se asigna por POSICIÓN.\n\n" +
         "Si el orden de la lista no es el mismo del archivo que se subió a SAP, cada " +
@@ -8749,11 +8948,13 @@ function App(){
     }));
 
     const dudosas = filas.filter(f=>!f.destino && (f.estado==="ambiguo"||f.estado==="repetido")).length;
+    const saltadas = filas.filter(f=>f.estado==="liberada"||f.estado==="ya-usado").length;
     const faltan = conDocEntryHoy.filter(o=>!porId.has(o.id)).length;
     setAvisoResp(null);
     setAvisoPegar(porId.size + " DocEntry asignado(s) " +
       (porContenido ? "por artículo" : "por posición") + "." +
       (dudosas ? " " + dudosas + " fila(s) quedaron sin asignar por duda: escribilas a mano." : "") +
+      (saltadas ? " Se saltaron " + saltadas + " de subidas anteriores (liberadas o ya asignadas)." : "") +
       (faltan ? " Quedan " + faltan + " orden(es) sin DocEntry." : "") +
       (salidasSinDocEntry.length
         ? " Las " + salidasSinDocEntry.length + " salida(s) de cajón no se tocaron: " +
@@ -9002,30 +9203,19 @@ function App(){
         </div>}
 
         <div className="card">
-          <h3 style={{margin:"0 0 3px",fontSize:14}}>Datos guardados</h3>
-          <p style={{margin:"0 0 12px",fontSize:12,color:"var(--gris)"}}>
-            El trabajo se guarda por día en este navegador. Si estuviste haciendo pruebas,
-            borralo antes de empezar con las boletas reales.</p>
+          {/* La lista de días guardados se quitó: el calendario 📅 Días faltantes
+              ya muestra qué días tienen datos. Para abrir un día se usa la fecha
+              de arriba; queda solo el borrado del día que está en pantalla. */}
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+            <span style={{fontSize:12,color:"var(--gris)",flex:1}}>
+              Día en pantalla: <strong style={{fontFamily:"var(--mono)"}}>{fecha}</strong></span>
+            <button className="btn min" style={{color:"var(--alerta)"}}
+              disabled={soloLectura || !dias.includes(fecha)}
+              onClick={()=>{ if(confirm("¿Borrar todas las órdenes del "+fecha+"?"+(conectadoNube?"\n\nTambién se borran de la nube para todos (el administrador las puede recuperar).":""))) borrarDia(fecha); }}>
+              Borrar este día</button>
+          </div>
 
-          {dias.length>0 ? <div style={{marginBottom:12}}>
-            {dias.map(f=>(
-              <div key={f} style={{display:"flex",alignItems:"center",gap:10,
-                   padding:"6px 0",borderBottom:"1px solid var(--borde)"}}>
-                <span style={{fontFamily:"var(--mono)",fontSize:12,
-                      fontWeight:f===fecha?600:400,flex:1}}>
-                  {f}{f===fecha && <span className="chip"
-                      style={{color:"var(--verde)",marginLeft:6}}>en pantalla</span>}
-                </span>
-                <button className="btn min" onClick={()=>setFecha(f)}>Abrir</button>
-                <button className="btn min" style={{color:"var(--alerta)"}} disabled={soloLectura}
-                  onClick={()=>{ if(confirm("¿Borrar todas las órdenes del "+f+"?"+(conectadoNube?"\n\nTambién se borran de la nube para todos (el administrador las puede recuperar).":""))) borrarDia(f); }}>
-                  Borrar</button>
-              </div>
-            ))}
-          </div> : <div style={{fontSize:12,color:"var(--gris)",marginBottom:12}}>
-            No hay nada guardado todavía.</div>}
-
-          <div style={{borderTop:"1px solid var(--borde)",paddingTop:12,marginBottom:14}}>
+          <div style={{marginBottom:14}}>
             <strong style={{fontSize:13}}>Pasar el trabajo a otro dispositivo</strong>
             <p style={{margin:"3px 0 10px",fontSize:11.5,color:"var(--gris)",lineHeight:1.5}}>
               Exportá al terminar en el iPad, guardá el archivo en OneDrive y en la casa
@@ -9401,11 +9591,14 @@ function App(){
             (ese es el DocNum). Corré esta consulta en SAP B1 sobre HANA:
             <pre style={{margin:"6px 0 0",fontSize:10.5,whiteSpace:"pre-wrap"}}>{CONSULTA(fecha)}</pre>
             <div style={{marginTop:7}}>
+              Guardala una vez en SAP (Herramientas → Consultas → Administrador de consultas):
+              <code style={{fontFamily:"var(--mono)"}}> [%0] </code> hace que pida la fecha cada vez.
               Copiá el resultado <strong>completo, con el encabezado</strong>: la app empareja
               cada DocEntry por artículo (<code style={{fontFamily:"var(--mono)"}}>ItemCode</code>),
               registro (<code style={{fontFamily:"var(--mono)"}}>Comments</code>) y cantidad, no
               por posición. También sirve pegar tres columnas sin encabezado: RecordKey,
               DocEntry y artículo (p. ej. <code style={{fontFamily:"var(--mono)"}}>1 95705 TIQ0150</code>).
+              Las órdenes ya liberadas (de una subida anterior del día) se saltan solas.
               Revisá la vista previa antes de aplicar.
             </div>
             <button className="btn min" style={{marginTop:7}}
@@ -9425,7 +9618,7 @@ function App(){
           <textarea rows={4} value={pegado} onChange={e=>setPegado(e.target.value)}
             placeholder={"DocEntry\tDocNum\tItemCode\tPlannedQty\tComments\n95705\t86103\tTIQ0150\t95\tRegistro de produccion N 4"}
             style={{fontFamily:"var(--mono)",fontSize:12,resize:"vertical"}}/>
-          <VistaPegado texto={pegado} destinos={conDocEntryHoy}/>
+          <VistaPegado texto={pegado} destinos={conDocEntryHoy} todas={ordenes}/>
           <div style={{display:"flex",gap:8,alignItems:"center",marginTop:8,flexWrap:"wrap"}}>
             <button className="btn sec" onClick={aplicarDocEntry} disabled={!pegado.trim()}>
               Aplicar DocEntry</button>
@@ -9475,6 +9668,8 @@ function App(){
             Los tres van en la misma corrida, cada uno en su fila. Corré
             <strong> Run Simulation</strong> antes de importar.
           </div>
+          {!soloLectura && <RevertirRecepciones fmt={fmtArch} fmtFecha={fmtFecha} bom={conBom}
+            doble={dobleEnc} claveOrd={claveOrd} colCom1={colCom1}/>}
           {salidasSinDocEntry.length>0 && <div className="avi war" style={{marginTop:12}}>
             <strong style={{color:"var(--tinta)"}}>
               {salidasSinDocEntry.length} salida(s) de cajón sin DocEntry</strong>
