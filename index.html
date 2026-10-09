@@ -4616,7 +4616,7 @@ function armarCom2(o){
      la boleta. El comentario es lo que después se lee en el sistema. */
   const gente = colaboradoresDe(o.colaboradores).map(g => g.canonico || g.leido);
   if(gente.length) t.push(`Colaboradores: ${gente.join(", ")}`);
-  return t.join(" · ").slice(0,MAX_COM);
+  return t.join(" | ").slice(0,MAX_COM);   /* ASCII: SAP no muestra bien el "·" */
 }
 /* PlannedQuantity: granel → casilla "Cantidades" (kg) · peso fijo → "Unidades" */
 function cantidadAuto(o){
@@ -6541,8 +6541,19 @@ function celda(v, fmt){
    nombre técnico del campo y la segunda con su descripción. Los datos empiezan
    en la fila 3. Con una sola fila, DTW toma el primer registro como si fuera el
    segundo encabezado y lo descarta en silencio. */
+/* DTW lee el TXT con la codificación de Windows, no UTF-8: un "·" llegaba
+   a SAP como "Â·" y lo mismo pasaría con tildes y eñes en los nombres. Todo lo
+   que va a un archivo de DTW se pasa a ASCII simple. */
+function paraSAP(v){
+  if(v === null || v === undefined || typeof v !== "string") return v;
+  return v.replace(/[·•]/g,"|").replace(/[–—]/g,"-")
+          .replace(/[“”«»]/g,'"').replace(/[‘’]/g,"'")
+          .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+          .replace(/[^\x00-\x7F]/g,"");
+}
 function tabla(filas, fmt, doble){
   const sep = fmt === "txt" ? "\t" : ",";
+  if(fmt === "txt") filas = filas.map(f => f.map(paraSAP));
   const conEncabezado = (doble===false || !filas.length)
     ? filas
     : [filas[0], filas[0], ...filas.slice(1)];
