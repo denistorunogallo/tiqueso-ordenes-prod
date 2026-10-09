@@ -138,3 +138,5 @@ salidas (Jordy y otros roles reciben "sin permiso"), acepta solo modelos conocid
 o configurados en el panel "Modelos de IA", y limita los tokens de salida. Cada
 lectura queda anotada en la tabla `lecturas_ia` (panel "📈 Lecturas IA", solo admin).
 Requiere haber corrido `supabase_bloque_A1.sql`.
+
+<!-- Publicación desde GitHub: nube-7 (2026-10-08) -->
