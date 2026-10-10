@@ -846,6 +846,13 @@ const CSS = `@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono
   .tira-dia{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel);
        border:1px solid var(--borde);border-radius:6px;padding:10px 12px;margin-bottom:10px}
   .tira-dia input{width:auto;min-width:160px}
+  .alerta-huecos{display:flex;gap:12px;align-items:flex-start;background:var(--queso-suave);
+       border:1px solid var(--oro);border-left:6px solid var(--oro);border-radius:6px;padding:12px 14px;margin-bottom:10px}
+  .alerta-huecos .icono{flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:var(--oro);color:#fff;
+       display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px}
+  .alerta-huecos .regs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 8px}
+  .alerta-huecos .regs span{font-family:var(--mono);font-weight:700;font-size:14px;background:#fff;
+       border:1px solid var(--oro);border-radius:4px;padding:2px 9px;color:var(--queso)}
   @media (max-width:640px){
     .titulo-app{display:none}
     .pestana{padding:8px 3px;font-size:12px;gap:4px;flex-direction:column}
@@ -6578,7 +6585,7 @@ function ordenEjemploSucia(){
 /* Marca de armado. Varias veces un cambio "no aparecía" y era que el navegador
    o Vercel seguían sirviendo el archivo anterior. Con esto se compara de un
    vistazo contra la versión que se acaba de subir. */
-const VERSION_ARCHIVO = "2026-10-09 nube-11";
+const VERSION_ARCHIVO = "2026-10-09 nube-12";
 
 const CAMPOS_SAP = {
   remarks:            "Comentarios",
@@ -8534,6 +8541,8 @@ function App(){
   const [pestana,setPestana] = useState(() => leerLocal("tiq_pestana","transcribir"));
   const cambiarPestana = p => { setPestana(p); guardarLocal("tiq_pestana", p); };
   const [pasoVer,setPasoVer] = useState(null);
+  const [avisoHuecos,setAvisoHuecos] = useState("");
+  const [,setRefrescar] = useState(0);   /* repinta tras ocultar el aviso de registros */
   const [apiKey,setApiKey]   = useState("");
   const [modelo,setModelo]   = useState(MODELO_DEFECTO);
   const [config,setConfig]   = useState(false);
@@ -8554,7 +8563,7 @@ function App(){
   const [claveOrd,setClaveOrd] = useState(CLAVE_ORDEN_DEFECTO);
   const [colCajon,setColCajon] = useState(CAMPO_CAJON_DEFECTO);
   const [pegado,setPegado]   = useState("");
-  useEffect(()=>{ setPasoVer(null); }, [fecha]);
+  useEffect(()=>{ setPasoVer(null); setAvisoHuecos(""); }, [fecha]);
   const [avisoPegar,setAvisoPegar] = useState("");
   const [avisoResp,setAvisoResp] = useState(null);   /* {tipo, texto} */
   const respRef = useRef(null);
@@ -9300,12 +9309,40 @@ function App(){
           </div>
           <div style={{flex:1,fontSize:12.5,color:"var(--acero)"}}>
             <strong>{ordenes.length}</strong> orden{ordenes.length===1?"":"es"}
-            {huecos.faltan.length>0 && <span style={{color:"var(--queso)"}}>
-              {" "}· faltan los registros {huecos.faltan.join(", ")}</span>}
             <div style={{fontSize:11,color:"var(--gris)",marginTop:2}}>
               {fecha===hoy() ? "hoy · "+ahoraHHMM()+" CR" : "hora CR: "+ahoraHHMM()}</div>
           </div>
         </div>
+
+        {/* Registros que faltan en el consecutivo: bien visible y con el mensaje
+            listo para pedir las hojas. Se puede ocultar en este dispositivo si se
+            confirmó que no existen; vuelve a salir si cambia la lista. */}
+        {huecos.faltan.length>0 && leerLocal("tiq_huecos_ok_"+fecha,"") !== huecos.faltan.join(",") &&
+          <div className="alerta-huecos" role="alert">
+            <div className="icono">!</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:15,fontWeight:700,color:"var(--tinta)"}}>
+                {huecos.faltan.length===1 ? "Falta 1 registro del consecutivo" : "Faltan "+huecos.faltan.length+" registros del consecutivo"}</div>
+              <div style={{fontSize:12.5,color:"var(--acero)",marginTop:2}}>
+                El día va del 1 al {huecos.hasta} y no aparecen:</div>
+              <div className="regs">{huecos.faltan.map(n => <span key={n}>{n}</span>)}</div>
+              <div style={{fontSize:12.5,color:"var(--acero)",lineHeight:1.5}}>
+                Pedí esas hojas antes de subir el día a SAP. Si se subiera así, esas producciones quedarían fuera.</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
+                <button className="btn" style={{background:"var(--oro)",borderColor:"var(--oro)",color:"#3A2A00",fontWeight:600}}
+                  onClick={async()=>{
+                    const r = huecos.faltan.length===1 ? "el registro " + huecos.faltan[0]
+                      : "los registros " + huecos.faltan.slice(0,-1).join(", ") + " y " + huecos.faltan[huecos.faltan.length-1];
+                    const ok = await copiar("Hola, de la producción del " + fechaCR(fecha) + " me faltan las hojas de " + r +
+                      ". ¿Me las pueden enviar, por favor? Gracias.");
+                    setAvisoHuecos(ok ? "Mensaje copiado: pegalo en WhatsApp o Teams." : "No se pudo copiar.");
+                  }}>Copiar mensaje para pedirlas</button>
+                <button className="btn sec" onClick={()=>{ guardarLocal("tiq_huecos_ok_"+fecha, huecos.faltan.join(",")); setAvisoHuecos(""); setRefrescar(x=>x+1); }}>
+                  Ya confirmé que no existen</button>
+              </div>
+              {avisoHuecos && <div style={{fontSize:12,color:"var(--verde)",marginTop:6}}>{avisoHuecos}</div>}
+            </div>
+          </div>}
 
         <Pestanas actual={pestana} onCambio={cambiarPestana} items={[
           {id:"transcribir", icono:"1", titulo:"Transcribir",
@@ -9526,7 +9563,10 @@ function App(){
               archivos={[{nombre:"OWOR_ProductionOrders_"+fecha+".txt", fila:"ProductionOrders", filas:csv.owor},
                          {nombre:"WOR1_ProductionOrders_Lines_"+fecha+".txt", fila:"ProductionOrders_Lines", filas:csv.wor1}]}
               zipBase={"Paso1_CrearOrdenes_"+fecha}
-              antesDeBajar={()=>{ if(!confirmarSinRevisar("Descargar")) return false; sellarRK(porSubir,false); return true; }}
+              antesDeBajar={()=>{
+                if(huecos.faltan.length && !confirm("Faltan los registros " + huecos.faltan.join(", ") +
+                   " del consecutivo. Esas producciones no van en el archivo.\n\n¿Crear las órdenes igual?")) return false;
+                if(!confirmarSinRevisar("Descargar")) return false; sellarRK(porSubir,false); return true; }}
               comoDTW={["En DTW (está en inglés): "+RUTA_DTW.crear+".",
                         "File type: txt (Tab delimited). OWOR en la fila ProductionOrders y WOR1 en ProductionOrders_Lines.",
                         "Corré Run Simulation y revisá que no haya rechazos.",
