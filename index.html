@@ -3606,7 +3606,8 @@ function buscarLote(inv, codigo, lote, almacenes){
   const norm = normalizarLote(lote);
   if(!norm) return null;
 
-  const exacto = filas.filter(f => f.lote === lote && enAlm(f));
+  const loteT = String(lote||"").trim();
+  const exacto = filas.filter(f => f.lote === loteT && enAlm(f));
   if(exacto.length) return {filas:exacto, como:"exacto"};
 
   /* Mismo lote sin guiones ni espacios: la boleta escribe 237-125 y el sistema
@@ -3697,7 +3698,7 @@ function planEntrega(ordenes, inv){
         const toma = Math.min(hay, falta);
         saldo[k] = +(hay - toma).toFixed(4);
         falta = +(falta - toma).toFixed(4);
-        usados.push({lote:f.lote, almacen:f.almacen, cantidad:toma, quedaba:hay});
+        usados.push({lote:f.lote, loteSAP:(f.loteSAP ?? f.lote), almacen:f.almacen, cantidad:toma, quedaba:hay});
       }
       const entregado = +(pedido - falta).toFixed(4);
       lineas.push({...base, como:hallado.como, usados,
@@ -3746,7 +3747,8 @@ function construirEmision(plan, fmt, col1, col2){
     let ln = 0;
     lineas.forEach(l => l.usados.forEach(u => {
       ige1.push([rk, ln, 202, o.docEntry, "", l.codigo, u.cantidad, u.almacen]);
-      btnt.push([rk, ln, "", ln, u.lote, "", "", "", "", "", "", u.cantidad]);
+      btnt.push([rk, ln, "", ln, (u.loteSAP && u.loteSAP !== u.lote) ? exactoSAP(u.loteSAP) : u.lote,
+                 "", "", "", "", "", "", u.cantidad]);
       ln++;
     }));
   });
@@ -3799,9 +3801,11 @@ function armarInventario(registros, origen){
     const almacen = String(f.almacen||"").trim();
     const cantidad = numeroSAP(f.cantidad);
     if(!codigo || !ALMACENES_COMPONENTES.includes(almacen) || !(cantidad > 0)) return;
+    const crudo = String(f.lote ?? "").replace(/[\r\n]/g,"");
     (porArticulo[codigo] = porArticulo[codigo] || []).push({
       codigo, almacen, cantidad,
-      lote: String(f.lote||"").trim(),
+      lote: crudo.trim(),     /* para buscar */
+      loteSAP: crudo,         /* para mandar a DTW tal cual */
       admision: fechaInv(f.admision),
       vence: fechaInv(f.vence)
     });
@@ -3838,7 +3842,8 @@ function leerInventarioTexto(texto){
     ". Copiá el resultado de la consulta con su encabezado.");
   const regs = lineas.slice(1).map(l => { const t = l.split("\t");
     const v = k => col[k] >= 0 ? (t[col[k]]||"").trim() : "";
-    return {codigo:v("codigo"), almacen:v("almacen"), lote:v("lote"), cantidad:v("cantidad"),
+    const loteCrudo = col.lote >= 0 ? (t[col.lote]||"") : "";
+    return {codigo:v("codigo"), almacen:v("almacen"), lote:loteCrudo, cantidad:v("cantidad"),
             admision:v("admision"), vence:v("vence")}; });
   return armarInventario(regs, "consulta de SAP");
 }
@@ -6573,7 +6578,7 @@ function ordenEjemploSucia(){
 /* Marca de armado. Varias veces un cambio "no aparecía" y era que el navegador
    o Vercel seguían sirviendo el archivo anterior. Con esto se compara de un
    vistazo contra la versión que se acaba de subir. */
-const VERSION_ARCHIVO = "2026-10-09 nube-10";
+const VERSION_ARCHIVO = "2026-10-09 nube-11";
 
 const CAMPOS_SAP = {
   remarks:            "Comentarios",
@@ -6647,7 +6652,12 @@ function limpiar(v){
   return String(v ?? "").replace(/[\t\r\n]+/g, " ").trim();
 }
 
+/* Un lote tal como existe en SAP, con espacios incluidos: algunos lotes
+   quedaron guardados como "3042262762 " (con un espacio al final) y DTW solo
+   los encuentra escritos igual. Todo lo demás se recorta. */
+const exactoSAP = v => ({exacto: String(v ?? "")});
 function celda(v, fmt){
+  if(v && typeof v === "object" && "exacto" in v) return String(v.exacto).replace(/[\t\r\n]+/g, " ");
   const s = limpiar(v);
   if(fmt === "txt") return s;                  /* tabulado: sin comillas */
   return /[",]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
@@ -8128,9 +8138,12 @@ function interpretarReverso(texto){
   const col = {}; Object.entries(ENC_REVERSO).forEach(([k,re])=>{ col[k]=enc.findIndex(x=>re.test(x)); });
   const faltan = ["recEntry","ordEntry","item","lote","cant","alm"].filter(k=>col[k]<0);
   if(faltan.length) return {filas:[], error:"No encuentro las columnas de la consulta (pegala con su encabezado, separada por tabuladores)."};
-  const filas = lineas.slice(1).map(parte).map((t,i)=>{
-    const v = k => col[k]>=0 ? (t[col[k]]||"") : "";
+  /* Las celdas se recortan al leerlas, menos el lote: en SAP hay lotes con un
+     espacio al final y la salida tiene que nombrarlos igual. */
+  const filas = lineas.slice(1).map(l=>l.split("\t")).map((t,i)=>{
+    const v = k => col[k]>=0 ? (t[col[k]]||"").trim() : "";
     const item = v("item").toUpperCase(), lote = v("lote");
+    const loteSAP = col.lote>=0 ? (t[col.lote]||"") : lote;   /* sin recortar */
     const cant = lecturasCantidad(v("cant"))[0] || 0;
     const disp = col.disp>=0 ? (lecturasCantidad(v("disp"))[0] ?? 0) : null;
     /* El catálogo dice de qué artículo es el lote: si no es el de la orden,
@@ -8139,7 +8152,7 @@ function interpretarReverso(texto){
     const cruzada = delLote.length>0 && !delLote.includes(item);
     return {i, recEntry:v("recEntry").replace(/[^\d]/g,""), recNum:v("recNum").replace(/[^\d]/g,""),
             ordEntry:v("ordEntry").replace(/[^\d]/g,""), ordNum:v("ordNum").replace(/[^\d]/g,""),
-            item, lote, cant, alm:v("alm"), disp, estado:v("estado").toUpperCase(),
+            item, lote, loteSAP, cant, alm:v("alm"), disp, estado:v("estado").toUpperCase(),
             coment:v("coment"), delLote, cruzada};
   }).filter(f=>f.recEntry && f.item && f.lote);
   return {filas, error: filas.length ? "" : "No hay filas con recepción, artículo y lote."};
@@ -8157,7 +8170,7 @@ function construirReverso(filas, fechaIso, fmt, clave, colCom){
        ". La recepcion quedo contra una orden de otro articulo.").slice(0,MAX_COM),
       "Reverso recepcion erronea app Ordenes"]);
     ige1.push([rk,0,x.item,String(x.cant),x.alm]);
-    btnt.push([rk,0,"",0,x.lote,"","","","","","",String(x.cant)]);
+    btnt.push([rk,0,"",0,(x.loteSAP && x.loteSAP!==x.lote) ? exactoSAP(x.loteSAP) : x.lote,"","","","","","",String(x.cant)]);
   });
   const cerrar=[["RecordKey", clave || CLAVE_ORDEN_DEFECTO, "ProductionOrderStatus", colCom || COL_COM1_DEFECTO]];
   const vistas = new Set();
@@ -9844,6 +9857,14 @@ function App(){
                           {n} {e}</span>)}
                     </div>
 
+                    {(() => {
+                      const conEsp = [...new Set(plan.lineas.flatMap(l => (l.usados||[])
+                        .filter(u => u.loteSAP && u.loteSAP !== u.lote).map(u => u.lote)))];
+                      return conEsp.length>0 && <div className="avi neu" style={{marginBottom:10}}>
+                        {conEsp.length} lote(s) están en SAP con un espacio al final ({conEsp.slice(0,4).join(", ")}
+                        {conEsp.length>4 ? "…" : ""}). La app los encontró igual y los manda a DTW tal como están en SAP.
+                      </div>;
+                    })()}
                     {problemas.length>0 && <div className="avi war" style={{marginBottom:10}}>
                       <strong style={{color:"var(--tinta)"}}>
                         {problemas.length} componente(s) para revisar</strong>
