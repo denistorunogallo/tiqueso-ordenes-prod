@@ -3753,31 +3753,94 @@ function construirEmision(plan, fmt, col1, col2){
   return {oige, ige1, btnt, ordenes:porOrden.size};
 }
 
-/* Lee el Excel de SAP. Solo se guardan los almacenes que se usan y las filas
-   con existencia: el archivo completo son casi 50 mil renglones y no cabe en
-   el navegador. */
+/* Inventario por lote para la entrega de componentes. Llega de dos formas:
+   pegado desde la consulta de SAP (lo normal desde nube-10) o el Excel de
+   antes. Las dos terminan en armarInventario. Solo se guardan los almacenes
+   que se usan y las filas con existencia. */
+const ALMACENES_COMPONENTES = ["02","05","11"];
+function CONSULTA_INVENTARIO(){
+  return 'SELECT T0."ItemCode" AS "Número de artículo", T2."ItemName" AS "Descripción",\n' +
+         '       T0."WhsCode" AS "Código de almacén", T1."DistNumber" AS "LOTE",\n' +
+         '       T0."Quantity" AS "Cantidad del Lote",\n' +
+         '       T1."InDate" AS "Fecha de admisión", T1."ExpDate" AS "Fecha de vencimiento"\n' +
+         'FROM OBTQ T0\n' +
+         'INNER JOIN OBTN T1 ON T1."ItemCode" = T0."ItemCode" AND T1."SysNumber" = T0."SysNumber"\n' +
+         'INNER JOIN OITM T2 ON T2."ItemCode" = T0."ItemCode"\n' +
+         'WHERE T0."WhsCode" IN (\'02\',\'05\',\'11\') AND T0."Quantity" > 0\n' +
+         'ORDER BY T0."ItemCode", T1."InDate"';
+}
+/* Fecha de SAP o Excel → AAAA-MM-DD, para ordenar por antigüedad. */
+function fechaInv(v){
+  if(v===null || v===undefined || v==="") return "";
+  if(typeof v === "number"){            /* número de serie de Excel */
+    const d = new Date(Math.round((v - 25569) * 86400000));
+    return isNaN(d) ? "" : d.toISOString().slice(0,10);
+  }
+  const t = String(v).trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t); if(m) return m[1]+"-"+m[2]+"-"+m[3];
+  m = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/.exec(t);
+  if(m){ const a = m[3].length===2 ? "20"+m[3] : m[3]; return a+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0"); }
+  m = /^(\d{4})(\d{2})(\d{2})$/.exec(t); if(m) return m[1]+"-"+m[2]+"-"+m[3];
+  return t;
+}
+/* "1,234.5000" / "1.234,5" / "4.8" → número. */
+function numeroSAP(v){
+  if(typeof v === "number") return v;
+  const t = String(v||"").replace(/\s/g,"");
+  if(/^-?\d{1,3}(,\d{3})+$/.test(t)) return parseFloat(t.replace(/,/g,""));
+  const l = lecturasCantidad(t); return l.length ? l[0] : 0;
+}
+function armarInventario(registros, origen){
+  const porArticulo = {};
+  let leidas = 0, guardadas = 0;
+  registros.forEach(f => {
+    leidas++;
+    const codigo = String(f.codigo||"").trim().toUpperCase();
+    const almacen = String(f.almacen||"").trim();
+    const cantidad = numeroSAP(f.cantidad);
+    if(!codigo || !ALMACENES_COMPONENTES.includes(almacen) || !(cantidad > 0)) return;
+    (porArticulo[codigo] = porArticulo[codigo] || []).push({
+      codigo, almacen, cantidad,
+      lote: String(f.lote||"").trim(),
+      admision: fechaInv(f.admision),
+      vence: fechaInv(f.vence)
+    });
+    guardadas++;
+  });
+  return {porArticulo, leidas, guardadas, origen,
+          cuando:new Date().toISOString().slice(0,16).replace("T"," ")};
+}
 function leerInventario(datos){
   const libro = XLSX.read(datos, {type:"array"});
   const hoja = libro.Sheets[libro.SheetNames[0]];
   const filas = XLSX.utils.sheet_to_json(hoja, {defval:""});
-  const usados = ["02","05","11"];
-  const porArticulo = {};
-  let leidas = 0, guardadas = 0;
-  filas.forEach(f => {
-    leidas++;
-    const codigo = String(f["Número de artículo"]||"").trim();
-    const almacen = String(f["Código de almacén"]||"").trim();
-    const cantidad = parseFloat(f["Cantidad del Lote"]) || 0;
-    if(!codigo || !usados.includes(almacen) || cantidad <= 0) return;
-    (porArticulo[codigo] = porArticulo[codigo] || []).push({
-      codigo, almacen, cantidad,
-      lote: String(f["LOTE"]||"").trim(),
-      admision: String(f["Fecha de admisión"]||""),
-      vence: String(f["Fecha de vencimiento"]||"")
-    });
-    guardadas++;
-  });
-  return {porArticulo, leidas, guardadas, cuando:new Date().toISOString().slice(0,16).replace("T"," ")};
+  return armarInventario(filas.map(f => ({
+    codigo: f["Número de artículo"], almacen: f["Código de almacén"], cantidad: f["Cantidad del Lote"],
+    lote: f["LOTE"], admision: f["Fecha de admisión"], vence: f["Fecha de vencimiento"]})), "Excel");
+}
+/* Lo pegado desde la grilla de SAP (separado por tabuladores, con encabezado). */
+const ENC_INVENTARIO = {
+  codigo:   /^(numero de articulo|itemcode|articulo|codigo de articulo)$/,
+  almacen:  /^(codigo de almacen|whscode|almacen)$/,
+  lote:     /^(lote|distnumber|numero de lote|lote serie)$/,
+  cantidad: /^(cantidad del lote|quantity|cantidad|disponible)$/,
+  admision: /^(fecha de admision|indate|admision)$/,
+  vence:    /^(fecha de vencimiento|expdate|vencimiento)$/
+};
+function leerInventarioTexto(texto){
+  const lineas = (texto||"").split("\n").map(l=>l.replace(/\r$/,"")).filter(l=>l.trim());
+  if(lineas.length < 2) throw new Error("Pegá el resultado completo, con el encabezado.");
+  const enc = lineas[0].split("\t").map(celdaEnc);
+  const col = {}; Object.entries(ENC_INVENTARIO).forEach(([k,re]) => { col[k] = enc.findIndex(x => re.test(x)); });
+  const faltan = ["codigo","almacen","lote","cantidad"].filter(k => col[k] < 0);
+  const NOMBRE = {codigo:"Número de artículo", almacen:"Código de almacén", lote:"LOTE", cantidad:"Cantidad del Lote"};
+  if(faltan.length) throw new Error("No encuentro las columnas " + faltan.map(k=>NOMBRE[k]).join(", ") +
+    ". Copiá el resultado de la consulta con su encabezado.");
+  const regs = lineas.slice(1).map(l => { const t = l.split("\t");
+    const v = k => col[k] >= 0 ? (t[col[k]]||"").trim() : "";
+    return {codigo:v("codigo"), almacen:v("almacen"), lote:v("lote"), cantidad:v("cantidad"),
+            admision:v("admision"), vence:v("vence")}; });
+  return armarInventario(regs, "consulta de SAP");
 }
 
 /* ══════════════ Consumo del día ══════════════
@@ -6510,7 +6573,7 @@ function ordenEjemploSucia(){
 /* Marca de armado. Varias veces un cambio "no aparecía" y era que el navegador
    o Vercel seguían sirviendo el archivo anterior. Con esto se compara de un
    vistazo contra la versión que se acaba de subir. */
-const VERSION_ARCHIVO = "2026-10-09 nube-9";
+const VERSION_ARCHIVO = "2026-10-09 nube-10";
 
 const CAMPOS_SAP = {
   remarks:            "Comentarios",
@@ -8273,52 +8336,22 @@ function BuscadorErrorDTW({ordenes}){
    trabajo: cada paso dice qué objeto de DTW abrir, en qué modo, qué archivo
    va en qué fila, y tiene un botón "ya lo hice" que destraba el siguiente.  */
 
-/* ZIP sin compresión (método "store"). Un solo archivo por paso: en iPad
-   iOS bloquea varias descargas seguidas, y en la PC se descomprime y cada
-   TXT va a su fila de DTW tal cual. */
-const TABLA_CRC = (() => {
-  const t = new Uint32Array(256);
-  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n]=c>>>0; }
-  return t;
-})();
-function crc32(b){ let c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c = TABLA_CRC[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
-function armarZip(archivos){
-  const enc = new TextEncoder(), partes = [], central = [];
-  const d = new Date();
-  const hora = (d.getHours()<<11) | (d.getMinutes()<<5) | (d.getSeconds()>>1);
-  const dia  = ((d.getFullYear()-1980)<<9) | ((d.getMonth()+1)<<5) | d.getDate();
-  let off = 0;
-  archivos.forEach(a => {
-    const nom = enc.encode(a.nombre), dat = enc.encode(a.texto), crc = crc32(dat);
-    const h = new DataView(new ArrayBuffer(30));
-    h.setUint32(0,0x04034b50,true); h.setUint16(4,20,true); h.setUint16(10,hora,true); h.setUint16(12,dia,true);
-    h.setUint32(14,crc,true); h.setUint32(18,dat.length,true); h.setUint32(22,dat.length,true); h.setUint16(26,nom.length,true);
-    partes.push(new Uint8Array(h.buffer), nom, dat);
-    const c = new DataView(new ArrayBuffer(46));
-    c.setUint32(0,0x02014b50,true); c.setUint16(4,20,true); c.setUint16(6,20,true); c.setUint16(12,hora,true); c.setUint16(14,dia,true);
-    c.setUint32(16,crc,true); c.setUint32(20,dat.length,true); c.setUint32(24,dat.length,true); c.setUint16(28,nom.length,true);
-    c.setUint32(42,off,true);
-    central.push(new Uint8Array(c.buffer), nom);
-    off += 30 + nom.length + dat.length;
-  });
-  const tamC = central.reduce((t,x)=>t+x.length,0);
-  const e = new DataView(new ArrayBuffer(22));
-  e.setUint32(0,0x06054b50,true); e.setUint16(8,archivos.length,true); e.setUint16(10,archivos.length,true);
-  e.setUint32(12,tamC,true); e.setUint32(16,off,true);
-  return new Blob([...partes, ...central, new Uint8Array(e.buffer)], {type:"application/zip"});
-}
-async function bajarZip(nombre, archivos){
-  const blob = armarZip(archivos);
-  /* En iPad la salida natural es la hoja de compartir (Guardar en Archivos). */
+/* Un botón baja todos los TXT del paso, cada uno con su nombre, listos para
+   DTW (sin descomprimir nada). En iPad/iPhone iOS bloquea las descargas
+   seguidas: ahí se abre la hoja de compartir con todos los archivos juntos
+   y se eligen "Guardar en Archivos". */
+async function bajarVarios(archivos){
   if(ES_IOS && window.isSecureContext && navigator.canShare){
-    const f = new File([blob], nombre, {type:"application/zip"});
-    try{ if(navigator.canShare({files:[f]})){ await navigator.share({files:[f], title:nombre}); return; } }
+    const fs = archivos.map(a => new File([archivoBlob(a.texto,"txt",false)], a.nombre,
+                                          {type:FORMATOS.txt.mime}));
+    try{ if(navigator.canShare({files:fs})){ await navigator.share({files:fs}); return; } }
     catch(e){ return; }
   }
-  const u = URL.createObjectURL(blob), a = document.createElement("a");
-  a.href = u; a.download = nombre; a.rel = "noopener"; a.style.display = "none";
-  document.body.appendChild(a); a.click();
-  setTimeout(()=>{ a.remove(); URL.revokeObjectURL(u); }, 60000);
+  for(let i=0;i<archivos.length;i++){
+    bajar(archivos[i].nombre, archivos[i].texto, "txt", false);
+    /* un respiro entre descargas: sin él, algunos navegadores bajan solo la primera */
+    if(i < archivos.length-1) await new Promise(r => setTimeout(r, 450));
+  }
 }
 
 /* Preferencias de vista del dispositivo: solo comodidad, nunca datos. */
@@ -8332,7 +8365,8 @@ const CONSULTAS_SAP = {
   ruta: "Herramientas → Consultas → Consultas de usuario → Produccion Actual",
   categoria: "Produccion Actual",
   dia: "ORDENES DEL DIA (APP - PASO#2)",
-  reverso: "DETALLES PARA REVERSO RECEPCIONES (APP)"
+  reverso: "DETALLES PARA REVERSO RECEPCIONES (APP)",
+  inventario: "INVENTARIO POR LOTE (APP - PASO#5)"
 };
 /* DTW está en inglés: las rutas se escriben tal como aparecen en su menú. */
 const RUTA_DTW = {
@@ -8382,7 +8416,7 @@ function PasoDTW({n, titulo, objeto, tecnico, modo, archivos, zipBase, antesDeBa
   const [verGuia, setVerGuia] = useState(() => leerLocal("tiq_guia_paso_" + n, "") !== "visto");
   const bajarTodo = () => {
     if(antesDeBajar && !antesDeBajar()) return;
-    bajarZip(zipBase + ".zip", conDatos.map(a => ({nombre:a.nombre, texto:tabla(a.filas, "txt", true)})));
+    bajarVarios(conDatos.map(a => ({nombre:a.nombre, texto:tabla(a.filas, "txt", true)})));
   };
   return <div className="card paso-card">
     <div className="lbl">Paso {n} de 5</div>
@@ -8405,7 +8439,7 @@ function PasoDTW({n, titulo, objeto, tecnico, modo, archivos, zipBase, antesDeBa
       </table>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
         <button className="btn" onClick={bajarTodo}>
-          ⬇ Descargar {conDatos.length === 1 ? "el archivo" : "los " + conDatos.length + " archivos"} (ZIP)</button>
+          ⬇ Descargar {conDatos.length === 1 ? "el archivo" : "los " + conDatos.length + " archivos"} (TXT)</button>
       </div>
       {unoPorUno && <details style={{marginTop:8}}>
         <summary className="plegable">Ver, copiar o bajar uno por uno</summary>
@@ -8461,6 +8495,7 @@ function App(){
   /* El inventario vive solo en memoria: son decenas de miles de filas y se
      carga una vez al final del día, cuando se hace la entrega. */
   const [inventario,setInventario] = useState(null);
+  const [invTexto,setInvTexto] = useState("");
   const [invCargando,setInvCargando] = useState(false);
   /* La lista viva de colaboradores. Se guarda aparte de las órdenes porque no
      pertenece a un día: es del taller. */
@@ -9712,7 +9747,7 @@ function App(){
             {/* ═══ PASO 5 · COMPONENTES ═══ */}
             {pasoVisto===5 && <PasoDTW n={5} titulo="Entregar los componentes"
               objeto={RUTA_DTW.entregar} tecnico="oInventoryGenExit" modo="Add new data"
-              comoDTW={["Bajá de SAP el Excel «Inventario en stock por lote» y cargalo acá.",
+              comoDTW={["En SAP corré «"+CONSULTAS_SAP.inventario+"» y pegá el resultado acá.",
                         "Revisá los componentes marcados para revisar.",
                         "En DTW: "+RUTA_DTW.entregar+" (oInventoryGenExit), con los tres archivos en Documents, Document_Lines y BatchNumbers.",
                         "Run Simulation y después Import."]}
@@ -9743,11 +9778,34 @@ function App(){
                 onClick:()=>{ marcarOrdenes(aEntregar,"componentesEntregados",true); guardarLocal("tiq_guia_paso_5","visto"); setPasoVer(null); }} : null}>
           {!inventario
             ? <div>
-                <div className="avi neu" style={{fontSize:11.5,marginBottom:10,lineHeight:1.5}}>
-                  Hace falta el Excel de <strong>Inventario en stock por lote</strong> de SAP.
-                  Se leen los almacenes 02 (Cámara A), 05 (Empaque y Transformación #1)
-                  y 11 (Bodega de suministros).
+                <ol className="guia" style={{fontSize:13,color:"var(--tinta)",marginTop:0}}>
+                  <li>En SAP: {CONSULTAS_SAP.ruta} → <strong>{CONSULTAS_SAP.inventario}</strong> y ejecutala.</li>
+                  <li>Seleccioná todo el resultado, <strong>con el encabezado</strong>, copialo y pegalo acá.</li>
+                </ol>
+                <div style={{fontSize:11.5,color:"var(--gris)",margin:"-2px 0 8px"}}>
+                  Se usan los almacenes 02 (Cámara A), 05 (Empaque y Transformación #1) y 11 (Bodega de suministros).</div>
+                <textarea rows={4} value={invTexto} onChange={e=>setInvTexto(e.target.value)}
+                  placeholder={"Pegá acá el resultado de «"+CONSULTAS_SAP.inventario+"», con el encabezado"}
+                  style={{fontFamily:"var(--mono)",fontSize:12,resize:"vertical"}}/>
+                <div style={{display:"flex",gap:8,alignItems:"center",marginTop:8,flexWrap:"wrap"}}>
+                  <button className="btn" disabled={!invTexto.trim()} onClick={()=>{
+                    try{ setInventario(leerInventarioTexto(invTexto)); setInvTexto(""); }
+                    catch(e){ alert(e.message); }
+                  }}>Usar este inventario</button>
                 </div>
+                <details style={{marginTop:10}}>
+                  <summary className="plegable">Ver el texto de la consulta</summary>
+                  <div style={{fontSize:12,color:"var(--acero)",lineHeight:1.5,marginTop:6}}>
+                    Se guarda una vez en SAP, en <strong>{CONSULTAS_SAP.categoria}</strong>, con el nombre{" "}
+                    <strong>{CONSULTAS_SAP.inventario}</strong>. No pide fecha: es la existencia de ahora.
+                    <pre style={{margin:"6px 0 0",fontSize:10.5,whiteSpace:"pre-wrap"}}>{CONSULTA_INVENTARIO()}</pre>
+                    <button className="btn min" style={{marginTop:6}} onClick={async()=>{ await copiar(CONSULTA_INVENTARIO()); }}>
+                      Copiar la consulta</button>
+                  </div>
+                </details>
+                <details style={{marginTop:6}}>
+                  <summary className="plegable">O cargar el Excel «Inventario en stock por lote» (como antes)</summary>
+                  <div style={{marginTop:8}}>
                 <input type="file" accept=".xlsx,.xls" onChange={async ev=>{
                   const f = ev.target.files && ev.target.files[0];
                   if(!f) return;
@@ -9759,12 +9817,14 @@ function App(){
                   finally{ setInvCargando(false); }
                 }}/>
                 {invCargando && <div style={{fontSize:12,marginTop:8}}>Leyendo…</div>}
+                  </div>
+                </details>
               </div>
             : <div>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",
                      fontSize:11.5,color:"var(--gris)",marginBottom:10}}>
-                  <span>{inventario.guardadas} lotes con existencia · cargado {inventario.cuando}</span>
-                  <button className="btn min" onClick={()=>setInventario(null)}>Cambiar archivo</button>
+                  <span>{inventario.guardadas} lotes con existencia · {inventario.origen||"Excel"} · cargado {inventario.cuando}</span>
+                  <button className="btn min" onClick={()=>setInventario(null)}>Cambiar inventario</button>
                 </div>
 
                 {(() => {
@@ -9823,11 +9883,22 @@ function App(){
                     </div>}
 
                     {emision.ige1.length>1 ? <div>
-                      <div className="avi neu" style={{fontSize:11.5,marginBottom:10}}>
-                        <strong>En DTW:</strong> objeto{" "}
-                        <strong>Inventory · Inventory Genexit</strong>, modo{" "}
-                        <strong>Add new data</strong>. Los tres archivos juntos.
-                      </div>
+                      <table className="tabla-archivos" style={{marginBottom:10}}>
+                        <thead><tr><th>#</th><th>Archivo</th><th>Va en la fila de DTW</th><th>Filas</th></tr></thead>
+                        <tbody>
+                          <tr><td>1</td><td style={{fontFamily:"var(--mono)",fontSize:11}}>{"OIGE_IssueForProduction_"+fecha+".txt"}</td><td><b>Documents</b></td><td>{emision.oige.length-1}</td></tr>
+                          <tr><td>2</td><td style={{fontFamily:"var(--mono)",fontSize:11}}>{"IGE1_IssueForProduction_Lines_"+fecha+".txt"}</td><td><b>Document_Lines</b></td><td>{emision.ige1.length-1}</td></tr>
+                          <tr><td>3</td><td style={{fontFamily:"var(--mono)",fontSize:11}}>{"BTNT_IssueForProduction_"+fecha+".txt"}</td><td><b>BatchNumbers</b></td><td>{emision.btnt.length-1}</td></tr>
+                        </tbody>
+                      </table>
+                      <button className="btn" style={{marginBottom:10}} onClick={()=>{
+                        if(!confirmarSinRevisar("Descargar")) return;
+                        bajarVarios([
+                          {nombre:"OIGE_IssueForProduction_"+fecha+".txt", texto:tabla(emision.oige,"txt",true)},
+                          {nombre:"IGE1_IssueForProduction_Lines_"+fecha+".txt", texto:tabla(emision.ige1,"txt",true)},
+                          {nombre:"BTNT_IssueForProduction_"+fecha+".txt", texto:tabla(emision.btnt,"txt",true)}]);
+                      }}>⬇ Descargar los 3 archivos (TXT)</button>
+                      <details style={{marginBottom:10}}><summary className="plegable">Ver, copiar o bajar uno por uno</summary>
                       <Archivo antesDeBajar={()=>confirmarSinRevisar("Descargar")}
                         base={"OIGE_IssueForProduction_"+fecha} filas={emision.oige}
                         fmt={fmtArch} bom={conBom} doble={dobleEnc}
@@ -9846,6 +9917,7 @@ function App(){
                         nota="Los lotes de cada línea"
                         onVer={()=>setVista(vista==="BTE"?"":"BTE")} viendo={vista==="BTE"}/>
                       {vista==="BTE" && <pre style={{marginTop:0}}>{tabla(emision.btnt,fmtArch,dobleEnc)}</pre>}
+                      </details>
                     </div>
                     : <div className="avi war">Todavía no hay nada que entregar.</div>}
                   </div>;
@@ -9942,6 +10014,9 @@ function App(){
             <details><summary className="plegable">{CONSULTAS_SAP.dia}</summary>
               <pre style={{fontSize:10.5,whiteSpace:"pre-wrap"}}>{CONSULTA(fecha)}</pre>
               <button className="btn min" onClick={async()=>{ await copiar(CONSULTA(fecha)); }}>Copiar</button></details>
+            <details><summary className="plegable">{CONSULTAS_SAP.inventario}</summary>
+              <pre style={{fontSize:10.5,whiteSpace:"pre-wrap"}}>{CONSULTA_INVENTARIO()}</pre>
+              <button className="btn min" onClick={async()=>{ await copiar(CONSULTA_INVENTARIO()); }}>Copiar</button></details>
             <details><summary className="plegable">{CONSULTAS_SAP.reverso}</summary>
               <pre style={{fontSize:10.5,whiteSpace:"pre-wrap"}}>{CONSULTA_REVERSO()}</pre>
               <button className="btn min" onClick={async()=>{ await copiar(CONSULTA_REVERSO()); }}>Copiar</button></details>
@@ -9951,8 +10026,8 @@ function App(){
               doble={dobleEnc} claveOrd={claveOrd} colCom1={colCom1}/>
           </div>}
           {ES_IOS && <div className="avi neu" style={{fontSize:11.5}}>
-            <strong>Estás en iPad o iPhone.</strong> Los botones «Descargar (ZIP)» abren la hoja de compartir:
-            elegí <strong>Guardar en Archivos</strong>.</div>}
+            <strong>Estás en iPad o iPhone.</strong> Los botones «Descargar (TXT)» abren la hoja de compartir con
+            todos los archivos del paso: elegí <strong>Guardar en Archivos</strong>.</div>}
         </div>}
       </div>}
 
